@@ -5,10 +5,9 @@ services:
     build: .
     container_name: education-platform-app
     restart: always
-    environment:
-      - FLASK_SECRET_KEY=ВАШ_СУПЕР_СЕКРЕТНЫЙ_КЛЮЧ
-      - GIGACHAT_CREDENTIALS=ВАШИ_УЧЕТНЫЕ_ДАННЫЕ_GIGACHAT
-      - FLASK_APP=app.py
+    # Загружаем все переменные из файла .env
+    env_file:
+      - .env
     volumes:
       - instance_data:/app/instance
     expose:
@@ -22,9 +21,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+      # Подключаем нашу сгенерированную конфигурацию Nginx
+      - ./nginx/production.conf:/etc/nginx/conf.d/default.conf
       - ./education_platform/education_platform/static:/app/static:ro
-      # Общие папки для сертификатов и проверки домена
       - certbot_certs:/etc/letsencrypt
       - certbot_webroot:/var/www/certbot
     depends_on:
@@ -33,13 +32,9 @@ services:
   certbot:
     image: certbot/certbot
     container_name: education-platform-certbot
-    # Команда Certbot будет выполняться периодически, а не постоянно
-    # Поэтому 'restart: no' здесь не нужен, он будет запускаться через cron или вручную
     volumes:
-      # Общие папки для сертификатов и проверки домена
       - certbot_certs:/etc/letsencrypt
       - certbot_webroot:/var/www/certbot
-    # Команда по умолчанию - help. Мы будем переопределять ее при запуске.
     command: "--help"
 
 volumes:
