@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e # Немедленно выходить, если команда завершилась с ошибкой
 
 # ANSI цвета для красивого вывода
 C_RESET='\033[0m'
@@ -20,7 +21,7 @@ function error_exit {
 
 clear
 echoc "=================================================================" $C_BLUE
-echoc " Мастер установки образовательной платформы " $C_YELLOW
+echoc " Мастер установки образовательной платформы (v2.0) " $C_YELLOW
 echoc "=================================================================" $C_BLUE
 echo
 
@@ -35,6 +36,12 @@ fi
 echoc "   Docker и Docker Compose найдены." $C_GREEN
 echo
 
+# --- Очистка предыдущих запусков ---
+echoc "--> Производим полную очистку от предыдущих неудачных запусков..." $C_YELLOW
+docker-compose down --remove-orphans -v &>/dev/null || true
+echoc "   Очистка завершена." $C_GREEN
+echo
+
 # --- Сбор данных от пользователя ---
 echoc "2. Сбор необходимой информации..." $C_BLUE
 read -p "   Введите ваш домен (например, my-site.ru): " DOMAIN
@@ -47,7 +54,7 @@ if [ -z "$EMAIL" ]; then
     error_exit "Email не может быть пустым."
 fi
 
-read -s -p "   Введите ваш API-ключ GigaChat: " GIGACHAT_CREDENTIALS
+read -s -p "   Введите ваш API-ключ GigaChat (ввод скрыт для безопасности): " GIGACHAT_CREDENTIALS
 echo
 if [ -z "$GIGACHAT_CREDENTIALS" ]; then
     error_exit "API-ключ GigaChat не может быть пустым."
@@ -56,24 +63,16 @@ echo
 
 # --- Генерация файлов конфигурации ---
 echoc "3. Генерация файлов конфигурации..." $C_BLUE
-
-# Создание .env
 echoc "   - Создание файла .env..." $C_GREEN
 SECRET_KEY=$(openssl rand -hex 32)
 cat > .env <<EOL
-# Переменные окружения для Docker Compose
 FLASK_SECRET_KEY=${SECRET_KEY}
 GIGACHAT_CREDENTIALS=${GIGACHAT_CREDENTIALS}
 FLASK_APP=app.py
 EOL
 
-# Создание nginx/production.conf
 echoc "   - Создание nginx/production.conf из шаблона..." $C_GREEN
-if [ ! -f "nginx/nginx.conf.template" ]; then
-    error_exit "Шаблон nginx/nginx.conf.template не найден!"
-fi
 sed "s/%%DOMAIN%%/${DOMAIN}/g" nginx/nginx.conf.template > nginx/production.conf
-
 echoc "   Файлы успешно созданы." $C_GREEN
 echo
 
@@ -99,28 +98,20 @@ echo
 # --- Получение SSL сертификата ---
 echoc "5. Получение SSL-сертификата от Let's Encrypt..." $C_BLUE
 
-# Создаем "пустышку" сертификата для первого запуска Nginx
 echoc "   - Создание временного сертификата..." $C_GREEN
-path="/etc/letsencrypt/live/$DOMAIN"
-mkdir -p ./data/certbot/conf/live/$DOMAIN
 docker-compose run --rm --entrypoint "\
-  openssl req -x509 -nodes -newkey rsa:4096 -days 1\
-    -keyout '$path/privkey.pem' \
-    -out '$path/fullchain.pem' \
-    -subj '/CN=localhost'" certbot
+  sh -c 'mkdir -p /etc/letsencrypt/live/${DOMAIN} && \
+  openssl req -x509 -nodes -newkey rsa:4096 -days 1 \
+    -keyout /etc/letsencrypt/live/${DOMAIN}/privkey.pem \
+    -out /etc/letsencrypt/live/${DOMAIN}/fullchain.pem \
+    -subj /CN=localhost'" certbot
 
-# Запускаем Nginx
 echoc "   - Запуск Nginx..." $C_GREEN
 docker-compose up --force-recreate -d nginx
 
-# Удаляем "пустышку"
 echoc "   - Удаление временного сертификата..." $C_GREEN
-docker-compose run --rm --entrypoint "\
-  rm -Rf /etc/letsencrypt/live/$DOMAIN && \
-  rm -Rf /etc/letsencrypt/archive/$DOMAIN && \
-  rm -Rf /etc/letsencrypt/renewal/$DOMAIN.conf" certbot
+docker-compose run --rm --entrypoint "rm -Rf /etc/letsencrypt/live/${DOMAIN}" certbot
 
-# Запрашиваем настоящий сертификат
 echoc "   - Запрос настоящего сертификата..." $C_GREEN
 docker-compose run --rm --entrypoint "\
   certbot certonly --webroot -w /var/www/certbot \
@@ -128,9 +119,8 @@ docker-compose run --rm --entrypoint "\
     -d $DOMAIN -d www.$DOMAIN \
     --rsa-key-size 4096 \
     --agree-tos \
-    --force-renewal" certbot || error_exit "Не удалось получить SSL-сертификат. Проверьте логи выше."
+    --force-renewal" certbot
 
-# Перезагружаем Nginx с новым сертификатом
 echoc "   - Перезагрузка Nginx с новым сертификатом..." $C_GREEN
 docker-compose exec nginx nginx -s reload
 echo
