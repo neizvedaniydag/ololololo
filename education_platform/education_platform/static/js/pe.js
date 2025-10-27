@@ -6,7 +6,7 @@ import { situp } from './exercises/situp.js';
 import { plank } from './exercises/plank.js';
 import { mountain } from './exercises/mountain.js';
 let calibrationActive = false;
-
+ 
 console.log('=== MediaPipe загружен ===');
 
 const EXERCISES = {
