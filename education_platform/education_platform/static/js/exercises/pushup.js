@@ -14,10 +14,15 @@ export const pushup = {
     svgIcons: {
         bodyDown: '<svg width="56" height="56" viewBox="0 0 64 64" fill="white"><path d="M32 10 L32 40 M26 34 L32 40 L38 34" stroke="white" stroke-width="3" fill="none"/><rect x="28" y="42" width="8" height="3"/></svg>',
         bodyUp: '<svg width="56" height="56" viewBox="0 0 64 64" fill="white"><path d="M32 40 L32 10 M26 16 L32 10 L38 16" stroke="white" stroke-width="3" fill="none"/><rect x="28" y="8" width="8" height="3"/></svg>',
-        bodyStraight: '<svg width="56" height="56" viewBox="0 0 64 64" fill="white"><rect x="20" y="28" width="24" height="4"/>ircle cx="2020" cy="30" r="3"/>ircle cx="4444" cy="30" r="3"/></svg>',
+        bodyStraight: '<svg width="56" height="56" viewBox="0 0 64 64" fill="white"><rect x="20" y="28" width="24" height="4"/>ircle cx="20" cy="30" r="3"3"/>ircle cx="44" cy="30" r="3"3"/></svg>',
         check: '<svg width="48" height="48" viewBox="0 0 24 24" fill="white"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
         warning: '<svg width="48" height="48" viewBox="0 0 24 24" fill="white"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>',
-        error: '<svg width="48" height="48" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>'
+        error: '<svg width="48" height="48" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>',
+        // NEW: Иконки для калибровки
+        calibration: '<svg width="64" height="64" viewBox="0 0 64 64" fill="white">ircle cx="32" cy="32" r="28" stroke="white" stroke-width="3"3" fill="none"/><path d="M32 12 L32 32 L45 32" stroke="white" stroke-width="3"/></svg>',
+        step1: '<svg width="64" height="64" viewBox="0 0 64 64" fill="white">ircle cx="32" cy="32" r="28" fillll="#3b82f6"/><text x="32" y="42" font-size="32" font-weight="bold" text-anchor="middle" fill="white">1</text></svg>',
+        step2: '<svg width="64" height="64" viewBox="0 0 64 64" fill="white">ircle cx="32" cy="="32" r="28" fill="#3b82f6"/><text x="32" y="42" font-size="32" font-weight="bold" text-anchor="middle" fill="white">2</text></svg>',
+        step3: '<svg width="64" height="64" viewBox="0 0 64 64" fill="white">ircle cx="32" cy="32" r="28"8" fill="#10b981"/><text x="32" y="42" font-size="32" font-weight="bold" text-anchor="middle" fill="white">✓</text></svg>'
     },
 
     thresholds: {
@@ -31,34 +36,31 @@ export const pushup = {
         headShoulderRatioMax: 0.95,
         headShoulderRatioMin: 0.7,
         shoulderHipDiffMax: 0.15,
-        // NEW: КРИТИЧЕСКИЕ пороги для защиты от сидения
-        minBodyAspectRatio: 1.5,         // Тело ДОЛЖНО быть ГОРИЗОНТАЛЬНЫМ (ширина > высоты в 1.5 раза)
-        maxBodyAspectRatio: 4.0,         // Но не слишком широким (не только верх тела)
-        minNoseToAnkleDistance: 0.4,     // Расстояние от носа до лодыжек минимум 40% от ширины кадра
-        shoulderMaxYPosition: 0.7,       // Плечи не должны быть выше 70% кадра (при сидении они в центре/верху)
-        ankleMinYPosition: 0.5,          // Лодыжки должны быть ниже 50% кадра
-        wristNoseYDiffMax: 0.15          // Запястья и нос должны быть примерно на одном уровне по Y (±15%)
+        minBodyAspectRatio: 1.5,
+        maxBodyAspectRatio: 4.0,
+        minNoseToAnkleDistance: 0.4,
+        shoulderMaxYPosition: 0.7,
+        ankleMinYPosition: 0.5,
+        wristNoseYDiffMax: 0.15
     },
 
     getInitialState() {
         return { 
             position: 'up',
-            calibrationStep: 0,
+            calibrationStep: 0,  // 0-2: калибровка, 3: завершена
             calibrationSamples: [],
             calibratedMin: null,
             calibratedMax: null,
             failedChecks: 0,
             consecutiveValidFrames: 0,
-            lastErrorType: null  // NEW: Тип последней ошибки
+            lastErrorType: null
         };
     },
 
-    // NEW: Функция для вычисления расстояния между точками
     calculateDistance(p1, p2) {
         return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
     },
 
-    // NEW: Функция проверки видимости критических точек
     checkLandmarksVisibility(lm) {
         const criticalPoints = [
             { idx: 0, name: 'нос' },
@@ -88,16 +90,27 @@ export const pushup = {
         return { valid: true };
     },
 
+    // NEW: Функция для отображения прогресса калибровки
+    getCalibrationProgress(state) {
+        const totalSamplesNeeded = 60;
+        const currentSamples = state.calibrationSamples.length;
+        const percentage = Math.round((currentSamples / totalSamplesNeeded) * 100);
+        
+        return {
+            percentage: percentage,
+            samplesCollected: currentSamples,
+            samplesNeeded: totalSamplesNeeded,
+            remainingSeconds: Math.ceil((totalSamplesNeeded - currentSamples) / 20) // ~20 кадров/сек
+        };
+    },
+
     analyze(lm, state, showHint, logError, calcAngle) {
         
-        // ========== КРИТИЧЕСКАЯ ПРОВЕРКА #0: ВИДИМОСТЬ ВСЕХ ТОЧЕК ==========
+        // ========== КРИТИЧЕСКАЯ ПРОВЕРКА #0: ВИДИМОСТЬ ==========
         const visibilityCheck = this.checkLandmarksVisibility(lm);
         if (!visibilityCheck.valid) {
             state.consecutiveValidFrames = 0;
             state.failedChecks++;
-            if (state.lastErrorType !== 'visibility') {
-                state.lastErrorType = 'visibility';
-            }
             let result = { counted: false, correct: false, status: '' };
             result.status = `❌ ${visibilityCheck.reason}! Встаньте в кадр ПОЛНОСТЬЮ!`;
             showHint('ВСЁ ТЕЛО должно быть видно!', this.svgIcons.error, 'rgba(239, 68, 68, 0.95)');
@@ -115,10 +128,7 @@ export const pushup = {
         const ankleRight = lm[28];
         const ankleY = (ankleLeft.y + ankleRight.y) / 2;
         const wristY = (lm[15].y + lm[16].y) / 2;
-        const kneeY = (lm[25].y + lm[26].y) / 2;
 
-        // ========== КРИТИЧЕСКАЯ ПРОВЕРКА #1: ASPECT RATIO (ГОРИЗОНТАЛЬНОСТЬ) ==========
-        // Вычисляем ширину и высоту тела
         const bodyWidth = Math.max(
             Math.abs(shoulderRight.x - shoulderLeft.x),
             Math.abs(lm[16].x - lm[15].x),
@@ -127,88 +137,10 @@ export const pushup = {
         const bodyHeight = Math.abs(ankleY - noseY);
         const bodyAspectRatio = bodyWidth / bodyHeight;
 
-        if (bodyAspectRatio < this.thresholds.minBodyAspectRatio) {
-            state.consecutiveValidFrames = 0;
-            state.failedChecks++;
-            if (state.lastErrorType !== 'aspect') {
-                state.lastErrorType = 'aspect';
-            }
-            let result = { counted: false, correct: false, status: '' };
-            result.status = `❌❌❌ ВЫ СИДИТЕ ИЛИ СТОИТЕ! Тело вертикальное! Соотношение: ${bodyAspectRatio.toFixed(2)} (нужно >${this.thresholds.minBodyAspectRatio})`;
-            showHint('ЛЯГТЕ ГОРИЗОНТАЛЬНО!', this.svgIcons.error, 'rgba(255, 0, 0, 0.98)');
-            if (state.failedChecks > 30) state.position = 'up';
-            return result;
-        }
-
-        if (bodyAspectRatio > this.thresholds.maxBodyAspectRatio) {
-            state.consecutiveValidFrames = 0;
-            state.failedChecks++;
-            let result = { counted: false, correct: false, status: '' };
-            result.status = `❌ Только верх тела в кадре! Соотношение: ${bodyAspectRatio.toFixed(2)} (макс ${this.thresholds.maxBodyAspectRatio})`;
-            showHint('Покажите ВСЁ ТЕЛО!', this.svgIcons.error, 'rgba(239, 68, 68, 0.95)');
-            if (state.failedChecks > 30) state.position = 'up';
-            return result;
-        }
-
-        // ========== КРИТИЧЕСКАЯ ПРОВЕРКА #2: РАССТОЯНИЕ ОТ НОСА ДО ЛОДЫЖЕК ==========
         const noseToAnkleDistLeft = this.calculateDistance(lm[0], ankleLeft);
         const noseToAnkleDistRight = this.calculateDistance(lm[0], ankleRight);
         const noseToAnkleDist = (noseToAnkleDistLeft + noseToAnkleDistRight) / 2;
 
-        if (noseToAnkleDist < this.thresholds.minNoseToAnkleDistance) {
-            state.consecutiveValidFrames = 0;
-            state.failedChecks++;
-            if (state.lastErrorType !== 'distance') {
-                state.lastErrorType = 'distance';
-            }
-            let result = { counted: false, correct: false, status: '' };
-            result.status = `❌❌ ТЕЛО НЕ РАСТЯНУТО! Расстояние нос-лодыжки: ${(noseToAnkleDist * 100).toFixed(1)}% (нужно >${this.thresholds.minNoseToAnkleDistance * 100}%)`;
-            showHint('РАСТЯНИТЕ ТЕЛО В ПЛАНКЕ!', this.svgIcons.error, 'rgba(255, 0, 0, 0.98)');
-            if (state.failedChecks > 30) state.position = 'up';
-            return result;
-        }
-
-        // ========== КРИТИЧЕСКАЯ ПРОВЕРКА #3: ПЛЕЧИ В НИЖНЕЙ ЧАСТИ КАДРА ==========
-        if (shoulderY < this.thresholds.shoulderMaxYPosition) {
-            state.consecutiveValidFrames = 0;
-            state.failedChecks++;
-            if (state.lastErrorType !== 'shoulderPos') {
-                state.lastErrorType = 'shoulderPos';
-            }
-            let result = { counted: false, correct: false, status: '' };
-            result.status = `❌❌ ПЛЕЧИ СЛИШКОМ ВЫСОКО В КАДРЕ! Позиция: ${(shoulderY * 100).toFixed(0)}% (нужно >${this.thresholds.shoulderMaxYPosition * 100}%)`;
-            showHint('ВЫ СИДИТЕ/СТОИТЕ!', this.svgIcons.error, 'rgba(255, 0, 0, 0.98)');
-            if (state.failedChecks > 30) state.position = 'up';
-            return result;
-        }
-
-        // ========== КРИТИЧЕСКАЯ ПРОВЕРКА #4: ЛОДЫЖКИ В НИЖНЕЙ ЧАСТИ КАДРА ==========
-        if (ankleY < this.thresholds.ankleMinYPosition) {
-            state.consecutiveValidFrames = 0;
-            state.failedChecks++;
-            let result = { counted: false, correct: false, status: '' };
-            result.status = `❌ ЛОДЫЖКИ СЛИШКОМ ВЫСОКО! Позиция: ${(ankleY * 100).toFixed(0)}%`;
-            showHint('Ноги должны быть ВНИЗУ кадра!', this.svgIcons.error, 'rgba(239, 68, 68, 0.95)');
-            if (state.failedChecks > 30) state.position = 'up';
-            return result;
-        }
-
-        // ========== КРИТИЧЕСКАЯ ПРОВЕРКА #5: ЗАПЯСТЬЯ И НОС НА ОДНОМ УРОВНЕ ==========
-        const wristNoseYDiff = Math.abs(wristY - noseY);
-        if (wristNoseYDiff > this.thresholds.wristNoseYDiffMax) {
-            state.consecutiveValidFrames = 0;
-            state.failedChecks++;
-            if (state.lastErrorType !== 'wristLevel') {
-                state.lastErrorType = 'wristLevel';
-            }
-            let result = { counted: false, correct: false, status: '' };
-            result.status = `❌❌ РУКИ НЕ НА УРОВНЕ ГОЛОВЫ! Разница: ${(wristNoseYDiff * 100).toFixed(1)}% (макс ${this.thresholds.wristNoseYDiffMax * 100}%)`;
-            showHint('РУКИ И ГОЛОВА НА ОДНОМ УРОВНЕ!', this.svgIcons.error, 'rgba(255, 0, 0, 0.98)');
-            if (state.failedChecks > 30) state.position = 'up';
-            return result;
-        }
-
-        // ========== БАЗОВЫЕ УГЛЫ ==========
         const elbowLeft = calcAngle(lm[11], lm[13], lm[15]);
         const elbowRight = calcAngle(lm[12], lm[14], lm[16]);
         const elbow = Math.round((elbowLeft + elbowRight) / 2);
@@ -221,42 +153,50 @@ export const pushup = {
         const kneeAngleRight = calcAngle(lm[24], lm[26], lm[28]);
         const kneeAngle = Math.round((kneeAngleLeft + kneeAngleRight) / 2);
 
-        const leftShoulderX = lm[11].x;
-        const rightShoulderX = lm[12].x;
-        const leftWristX = lm[15].x;
-        const rightWristX = lm[16].x;
-        
-        const shoulderWidth = Math.abs(rightShoulderX - leftShoulderX);
-        const handWidth = Math.abs(rightWristX - leftWristX);
-        const handWidthRatio = handWidth / shoulderWidth;
-
         const bodyHeightDiff = Math.abs(shoulderY - hipY);
         const isHorizontal = bodyHeightDiff < this.thresholds.shoulderHipDiffMax && noseY < hipY;
-
-        const elbowDiff = Math.abs(elbowLeft - elbowRight);
-        const movementSynchronized = elbowDiff < 15;
-
-        const handsPositionValid = handWidthRatio >= 1.0 && handWidthRatio <= 1.8;
-
+        
         const bodyLineCorrect = bodyAngle >= this.thresholds.bodyAngleMin && 
                                  bodyAngle <= this.thresholds.bodyAngleMax;
 
         let result = { counted: false, correct: false, status: '' };
 
-        // ========== КАЛИБРОВКА ==========
+        // ========== КАЛИБРОВКА С ЧЕТКИМИ ЭТАПАМИ ==========
         if (state.calibrationStep < 3) {
-            if (!isHorizontal) {
-                result.status = '⚠️ Встаньте в упор лёжа (планку)! Тело должно быть горизонтально';
-                showHint('Встаньте в планку!', this.svgIcons.bodyStraight, 'rgba(239, 68, 68, 0.95)');
+            
+            // БАЗОВАЯ ПРОВЕРКА перед калибровкой
+            if (bodyAspectRatio < this.thresholds.minBodyAspectRatio) {
+                result.status = `🚫 СНАЧАЛА ЛЯГТЕ В ПЛАНКУ! Вы сидите/стоите (соотношение ${bodyAspectRatio.toFixed(1)})`;
+                showHint('❌ ЛЯГТЕ ГОРИЗОНТАЛЬНО!', this.svgIcons.error, 'rgba(255, 0, 0, 0.98)');
+                state.calibrationSamples = []; // Сбрасываем прогресс если человек встал
                 return result;
             }
 
+            if (!isHorizontal || kneeAngle < this.thresholds.kneeAngleMin) {
+                result.status = `🚫 ПРИМИТЕ ПРАВИЛЬНОЕ ПОЛОЖЕНИЕ! Тело должно быть в планке, ноги прямые`;
+                showHint('Встаньте в ПЛАНКУ правильно!', this.svgIcons.bodyStraight, 'rgba(239, 68, 68, 0.95)');
+                state.calibrationSamples = []; // Сбрасываем прогресс
+                return result;
+            }
+
+            // ========== ШАГ 1: ОПУСКАНИЕ ВНИЗ ==========
             if (state.calibrationStep === 0) {
-                result.status = `📍 КАЛИБРОВКА: Опуститесь грудью к полу и держите 3 сек`;
-                showHint(`Опуститесь вниз! Локоть: ${elbow}°`, this.svgIcons.bodyDown, 'rgba(59, 130, 246, 0.95)');
+                const progress = this.getCalibrationProgress(state);
                 
-                if (bodyLineCorrect && kneeAngle >= this.thresholds.kneeAngleMin && 
-                    bodyAspectRatio >= this.thresholds.minBodyAspectRatio) {
+                result.status = `🔧 КАЛИБРОВКА - ШАГ 1 из 3\n` +
+                               `📍 ОПУСТИТЕСЬ ГРУДЬЮ К ПОЛУ И ДЕРЖИТЕ\n` +
+                               `⏱️ Удерживайте позицию: ${progress.remainingSeconds} сек\n` +
+                               `📊 Прогресс: ${progress.percentage}% (${progress.samplesCollected}/${progress.samplesNeeded})\n` +
+                               `🔢 Угол локтя: ${elbow}°`;
+                
+                showHint(
+                    `⬇️ ШАГ 1/3: ОПУСТИТЕСЬ ВНИЗ!\n${progress.percentage}% [${'█'.repeat(Math.floor(progress.percentage/10))}${'░'.repeat(10-Math.floor(progress.percentage/10))}]`,
+                    this.svgIcons.step1,
+                    'rgba(59, 130, 246, 0.98)'
+                );
+                
+                // Калибруем только при правильной технике
+                if (bodyLineCorrect && kneeAngle >= this.thresholds.kneeAngleMin) {
                     state.calibrationSamples.push(elbow);
                 }
                 
@@ -267,12 +207,24 @@ export const pushup = {
                     state.calibrationStep = 1;
                 }
             }
+            // ========== ШАГ 2: ПОДЪЁМ ВВЕРХ ==========
             else if (state.calibrationStep === 1) {
-                result.status = `📍 КАЛИБРОВКА: Выпрямите руки полностью и держите 3 сек`;
-                showHint(`Выпрямите руки! Локоть: ${elbow}°`, this.svgIcons.bodyUp, 'rgba(59, 130, 246, 0.95)');
+                const progress = this.getCalibrationProgress(state);
                 
-                if (bodyLineCorrect && kneeAngle >= this.thresholds.kneeAngleMin && 
-                    bodyAspectRatio >= this.thresholds.minBodyAspectRatio) {
+                result.status = `🔧 КАЛИБРОВКА - ШАГ 2 из 3\n` +
+                               `📍 ВЫПРЯМИТЕ РУКИ ПОЛНОСТЬЮ И ДЕРЖИТЕ\n` +
+                               `⏱️ Удерживайте позицию: ${progress.remainingSeconds} сек\n` +
+                               `📊 Прогресс: ${progress.percentage}% (${progress.samplesCollected}/${progress.samplesNeeded})\n` +
+                               `🔢 Угол локтя: ${elbow}°`;
+                
+                showHint(
+                    `⬆️ ШАГ 2/3: ВЫПРЯМИТЕ РУКИ!\n${progress.percentage}% [${'█'.repeat(Math.floor(progress.percentage/10))}${'░'.repeat(10-Math.floor(progress.percentage/10))}]`,
+                    this.svgIcons.step2,
+                    'rgba(59, 130, 246, 0.98)'
+                );
+                
+                // Калибруем только при правильной технике
+                if (bodyLineCorrect && kneeAngle >= this.thresholds.kneeAngleMin) {
                     state.calibrationSamples.push(elbow);
                 }
                 
@@ -288,89 +240,94 @@ export const pushup = {
                     state.calibrationStep = 2;
                 }
             }
+            // ========== ШАГ 3: ЗАВЕРШЕНИЕ ==========
             else if (state.calibrationStep === 2) {
-                result.status = `✅ Калибровка завершена! Низ: ${state.calibratedMin}°, Верх: ${state.calibratedMax}°`;
-                showHint('✅ Калибровка готова! Начинайте!', this.svgIcons.check, 'rgba(16, 185, 129, 0.95)');
+                result.status = `✅ КАЛИБРОВКА ЗАВЕРШЕНА - ШАГ 3 из 3\n` +
+                               `📊 Результаты:\n` +
+                               `   • Нижняя точка: ${state.calibratedMin}°\n` +
+                               `   • Верхняя точка: ${state.calibratedMax}°\n` +
+                               `   • Порог опускания: <${this.thresholds.elbowDown}°\n` +
+                               `   • Порог подъёма: >${this.thresholds.elbowUp}°\n\n` +
+                               `🎯 НАЧИНАЙТЕ ОТЖИМАТЬСЯ!`;
+                
+                showHint(
+                    '✅ ШАГ 3/3: ГОТОВО!\n100% [██████████]',
+                    this.svgIcons.step3,
+                    'rgba(16, 185, 129, 0.98)'
+                );
                 
                 setTimeout(() => {
                     state.calibrationStep = 3;
-                }, 2000);
+                }, 3000);
             }
             
             return result;
         }
 
-        // ========== ОСТАЛЬНЫЕ ПРОВЕРКИ ==========
+        // ========== ОБЫЧНЫЙ РЕЖИМ ==========
+        
+        // Все критические проверки из предыдущей версии...
+        if (bodyAspectRatio < this.thresholds.minBodyAspectRatio) {
+            state.consecutiveValidFrames = 0;
+            state.failedChecks++;
+            result.status = `❌❌❌ ВЫ СИДИТЕ! Соотношение: ${bodyAspectRatio.toFixed(2)}`;
+            showHint('ЛЯГТЕ ГОРИЗОНТАЛЬНО!', this.svgIcons.error, 'rgba(255, 0, 0, 0.98)');
+            if (state.failedChecks > 30) state.position = 'up';
+            return result;
+        }
 
-        // ПРОВЕРКА: Колени согнуты (сидя)
+        if (noseToAnkleDist < this.thresholds.minNoseToAnkleDistance) {
+            state.consecutiveValidFrames = 0;
+            state.failedChecks++;
+            result.status = `❌❌ ТЕЛО НЕ РАСТЯНУТО! ${(noseToAnkleDist * 100).toFixed(1)}%`;
+            showHint('РАСТЯНИТЕ ТЕЛО!', this.svgIcons.error, 'rgba(255, 0, 0, 0.98)');
+            if (state.failedChecks > 30) state.position = 'up';
+            return result;
+        }
+
+        if (shoulderY < this.thresholds.shoulderMaxYPosition) {
+            state.consecutiveValidFrames = 0;
+            state.failedChecks++;
+            result.status = `❌❌ ПЛЕЧИ СЛИШКОМ ВЫСОКО! ${(shoulderY * 100).toFixed(0)}%`;
+            showHint('ВЫ СИДИТЕ/СТОИТЕ!', this.svgIcons.error, 'rgba(255, 0, 0, 0.98)');
+            if (state.failedChecks > 30) state.position = 'up';
+            return result;
+        }
+
         if (kneeAngle < this.thresholds.kneeAngleMin) {
             state.consecutiveValidFrames = 0;
             state.failedChecks++;
-            result.status = `❌ КОЛЕНИ СОГНУТЫ! ${kneeAngle}° (нужно >${this.thresholds.kneeAngleMin}°)`;
+            result.status = `❌ КОЛЕНИ СОГНУТЫ! ${kneeAngle}°`;
             showHint('ВЫПРЯМИТЕ НОГИ!', this.svgIcons.error, 'rgba(239, 68, 68, 0.95)');
             if (state.failedChecks > 30) state.position = 'up';
             return result;
         }
 
-        // ПРОВЕРКА: Запястья выше плеч (руки в воздухе)
         const wristBelowShoulder = wristY - shoulderY;
         if (wristBelowShoulder < this.thresholds.wristBelowShoulderMin) {
             state.consecutiveValidFrames = 0;
             state.failedChecks++;
-            result.status = `❌ РУКИ В ВОЗДУХЕ! Опустите руки на пол!`;
+            result.status = `❌ РУКИ В ВОЗДУХЕ!`;
             showHint('РУКИ НА ПОЛ!', this.svgIcons.error, 'rgba(239, 68, 68, 0.95)');
             if (state.failedChecks > 30) state.position = 'up';
             return result;
         }
 
-        // ПРОВЕРКА: Наклоны головы
-        const headShoulderRatio = noseY / shoulderY;
-        if (headShoulderRatio > this.thresholds.headShoulderRatioMax || 
-            headShoulderRatio < this.thresholds.headShoulderRatioMin) {
-            state.consecutiveValidFrames = 0;
-            state.failedChecks++;
-            result.status = `❌ НЕПРАВИЛЬНОЕ ПОЛОЖЕНИЕ ГОЛОВЫ! Соотношение: ${headShoulderRatio.toFixed(2)}`;
-            showHint('ДЕРЖИТЕ ГОЛОВУ РОВНО!', this.svgIcons.warning, 'rgba(239, 68, 68, 0.95)');
-            if (state.failedChecks > 30) state.position = 'up';
-            return result;
-        }
-
-        // ПРОВЕРКА: Тело не горизонтально
         if (!isHorizontal) {
             state.consecutiveValidFrames = 0;
             state.failedChecks++;
             result.status = '❌ Тело не горизонтально!';
-            showHint('Примите положение планки!', this.svgIcons.warning, 'rgba(239, 68, 68, 0.95)');
+            showHint('Положение планки!', this.svgIcons.warning, 'rgba(239, 68, 68, 0.95)');
             if (state.failedChecks > 30) state.position = 'up';
             return result;
         }
 
-        // ПРОВЕРКА: Тело не прямое
         if (!bodyLineCorrect) {
             state.consecutiveValidFrames = 0;
             state.failedChecks++;
-            result.status = `❌ Угол тела: ${bodyAngle}° (нужно ${this.thresholds.bodyAngleMin}-${this.thresholds.bodyAngleMax}°)`;
+            result.status = `❌ Угол тела: ${bodyAngle}°`;
             showHint('Держите тело прямо!', this.svgIcons.warning, 'rgba(239, 68, 68, 0.95)');
             if (state.failedChecks > 30) state.position = 'up';
-            return result;
-        }
-
-        // ПРОВЕРКА: Руки поставлены неправильно
-        if (!handsPositionValid) {
-            state.consecutiveValidFrames = 0;
-            state.failedChecks++;
-            result.status = `❌ Ширина рук: ${handWidthRatio.toFixed(2)}x (нужно 1.0-1.8x)`;
-            showHint('Неправильная постановка рук!', this.svgIcons.warning, 'rgba(239, 68, 68, 0.95)');
-            if (state.failedChecks > 30) state.position = 'up';
-            return result;
-        }
-
-        // ПРОВЕРКА: Движение несинхронное
-        if (!movementSynchronized) {
-            state.consecutiveValidFrames = 0;
-            state.failedChecks++;
-            result.status = `❌ Разница локтей: ${elbowDiff}°`;
-            showHint('Опускайтесь равномерно!', this.svgIcons.warning, 'rgba(239, 68, 68, 0.95)');
             return result;
         }
 
@@ -379,7 +336,7 @@ export const pushup = {
         state.failedChecks = 0;
         state.lastErrorType = null;
 
-        const minValidFrames = 8;  // Увеличено до 8 кадров
+        const minValidFrames = 8;
 
         // ОПУСКАНИЕ
         if (state.position === 'up' && elbow < this.thresholds.elbowDown) {
