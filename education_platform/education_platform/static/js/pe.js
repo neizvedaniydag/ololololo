@@ -5,8 +5,7 @@ import { neck } from './exercises/neck.js';
 import { situp } from './exercises/situp.js';
 import { plank } from './exercises/plank.js';
 import { mountain } from './exercises/mountain.js';
-let calibrationActive = false;
- 
+
 console.log('=== MediaPipe загружен ===');
 
 const EXERCISES = {
@@ -31,6 +30,9 @@ var hintsEnabled = true;
 
 // Для планки нужен таймер времени, потому что планка измеряется в СЕКУНДАХ, а не повторениях
 var plankTime = 0, plankTimer = null;
+
+// NEW: Для калибровки отжиманий
+var calibrationActive = false;
 
 var recordBtn = document.getElementById('recordBtn');
 var recordLabel = document.getElementById('recordLabel');
@@ -145,7 +147,7 @@ async function detect() {
                 draw.drawConnectors(lm, FaceLandmarker.FACE_LANDMARKS_TESSELATION, {color: '#00FF00', lineWidth: 2});
                 draw.drawConnectors(lm, FaceLandmarker.FACE_LANDMARKS_LEFT_EYE, {color: '#FF0000', lineWidth: 3});
                 draw.drawConnectors(lm, FaceLandmarker.FACE_LANDMARKS_RIGHT_EYE, {color: '#FF0000', lineWidth: 3});
-                if (recording && currentExercise) analyzeExercise(lm);
+                if ((recording || calibrationActive) && currentExercise) analyzeExercise(lm);
             }
         } else {
             const results = await poseLandmarker.detectForVideo(video, performance.now());
@@ -154,7 +156,7 @@ async function detect() {
                 const lm = results.landmarks[0];
                 draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, {color: '#00FF00', lineWidth: 5});
                 draw.drawLandmarks(lm, {color: '#FF0000', radius: 8, fillColor: '#FFFF00'});
-                if (recording && currentExercise) analyzeExercise(lm);
+                if ((recording || calibrationActive) && currentExercise) analyzeExercise(lm);
             }
         }
     } catch (error) {
@@ -176,7 +178,13 @@ function analyzeExercise(lm) {
         result = currentExercise.analyze(lm, exerciseState, showHint, logError, calcAngle);
     }
 
-    if (result.counted) {
+    // NEW: Обновление UI калибровки (только для отжиманий в режиме калибровки)
+    if (calibrationActive && currentExercise.name === 'pushup') {
+        updateCalibrationUI(result, exerciseState);
+    }
+
+    // Подсчет повторений (не во время калибровки)
+    if (result.counted && !calibrationActive) {
         counter++;
         if (result.correct) {
             correct++;
@@ -187,6 +195,64 @@ function analyzeExercise(lm) {
     }
 
     updateStatus(result.status);
+}
+
+// NEW: Функция обновления UI калибровки
+function updateCalibrationUI(result, state) {
+    const calibScreen = document.getElementById('calibrationScreen');
+    if (!calibScreen || calibScreen.style.display === 'none') return;
+    
+    // Извлекаем углы из статуса
+    const statusText = result.status || '';
+    const elbowMatch = statusText.match(/(?:локоть:|Локоть:)\s*(\d+)°/i);
+    const bodyMatch = statusText.match(/(?:тело:|Тело:)\s*(\d+)°/i);
+    
+    if (elbowMatch) {
+        document.getElementById('calibElbowAngle').textContent = elbowMatch[1] + '°';
+    }
+    if (bodyMatch) {
+        document.getElementById('calibBodyAngle').textContent = bodyMatch[1] + '°';
+    }
+    
+    // Определяем текущий шаг (0, 1, 2, 3)
+    const step = state.calibrationStep;
+    
+    // Обновляем прогресс
+    if (step === 0 || step === 1) {
+        const progress = Math.min(100, Math.round((state.calibrationSamples.length / 60) * 100));
+        document.getElementById('calibProgressBar').style.width = progress + '%';
+        document.getElementById('calibProgressText').textContent = progress + '%';
+        
+        const remainingSec = Math.ceil((60 - state.calibrationSamples.length) / 20);
+        
+        if (step === 0) {
+            document.getElementById('calibInstruction').innerHTML = 
+                '<strong>⬇️ ОПУСТИТЕСЬ ГРУДЬЮ К ПОЛУ</strong><br>Удерживайте позицию: ' + remainingSec + ' сек';
+            document.getElementById('calibStep1').classList.add('active');
+            document.getElementById('calibStep2').classList.remove('active');
+            document.getElementById('calibStep3').classList.remove('active', 'completed');
+        } else if (step === 1) {
+            document.getElementById('calibInstruction').innerHTML = 
+                '<strong>⬆️ ВЫПРЯМИТЕ РУКИ ПОЛНОСТЬЮ</strong><br>Удерживайте позицию: ' + remainingSec + ' сек';
+            document.getElementById('calibStep1').classList.add('completed');
+            document.getElementById('calibStep1').classList.remove('active');
+            document.getElementById('calibStep2').classList.add('active');
+            document.getElementById('calibStep3').classList.remove('completed');
+        }
+    } else if (step === 2) {
+        document.getElementById('calibProgressBar').style.width = '100%';
+        document.getElementById('calibProgressText').textContent = '100%';
+        document.getElementById('calibInstruction').innerHTML = 
+            '<strong>✅ КАЛИБРОВКА ЗАВЕРШЕНА!</strong><br>Сейчас начнется тренировка';
+        document.getElementById('calibStep2').classList.add('completed');
+        document.getElementById('calibStep2').classList.remove('active');
+        document.getElementById('calibStep3').classList.add('completed');
+    } else if (step === 3) {
+        // Калибровка завершена - скрываем экран и запускаем упражнение
+        calibrationActive = false;
+        document.getElementById('calibrationScreen').style.display = 'none';
+        startExerciseCountdown();
+    }
 }
 
 function showHint(msg, icon, bgColor = 'rgba(239, 68, 68, 0.95)', duration = 2500) {
@@ -208,7 +274,6 @@ function showHint(msg, icon, bgColor = 'rgba(239, 68, 68, 0.95)', duration = 250
     hintsOverlay.appendChild(hint);
     setTimeout(() => { if (hintsOverlay.contains(hint)) hintsOverlay.removeChild(hint); }, duration);
 }
-
 
 function logError(msg) {
     errorLog.push({ repNumber: counter + 1, message: msg });
@@ -235,8 +300,10 @@ function toggleRecording() {
     else stopExercise();
 }
 
+// MODIFIED: Обработка калибровки для отжиманий
 function startExercise() {
     document.getElementById('instructionsScreen').style.display = 'none';
+    
     counter = 0;
     correct = 0;
     incorrect = 0;
@@ -245,6 +312,33 @@ function startExercise() {
     plankTime = 0;
     updateUI();
 
+    // NEW: Проверка нужна ли калибровка (только для pushup)
+    if (currentExercise.name === 'pushup') {
+        calibrationActive = true;
+        document.getElementById('calibrationScreen').style.display = 'flex';
+        document.getElementById('overlayControls').style.display = 'flex';
+        
+        // Активируем первый шаг
+        document.getElementById('calibStep1').classList.add('active');
+        document.getElementById('calibStep2').classList.remove('active', 'completed');
+        document.getElementById('calibStep3').classList.remove('active', 'completed');
+        
+        // Сбрасываем прогресс
+        document.getElementById('calibProgressBar').style.width = '0%';
+        document.getElementById('calibProgressText').textContent = '0%';
+        document.getElementById('calibInstruction').innerHTML = 
+            '<strong>Встаньте в упор лёжа для начала калибровки</strong>';
+        document.getElementById('calibElbowAngle').textContent = '--°';
+        document.getElementById('calibBodyAngle').textContent = '--°';
+    } else {
+        // Для всех остальных упражнений - обычный запуск
+        calibrationActive = false;
+        startExerciseCountdown();
+    }
+}
+
+// NEW: Отдельная функция для запуска отсчета (чтобы использовать после калибровки)
+function startExerciseCountdown() {
     const cd = document.getElementById('countdown');
     let count = 3;
     cd.style.display = 'block';
@@ -279,6 +373,7 @@ function startExercise() {
 
 function stopExercise() {
     recording = false;
+    calibrationActive = false;
     recordBtn.classList.remove('recording');
     recordLabel.textContent = 'Начать';
     hintsOverlay.innerHTML = '';
@@ -287,6 +382,11 @@ function stopExercise() {
     if (plankTimer) {
         clearInterval(plankTimer);
         plankTimer = null;
+    }
+
+    // Скрываем экран калибровки если он был открыт
+    if (document.getElementById('calibrationScreen')) {
+        document.getElementById('calibrationScreen').style.display = 'none';
     }
 
     const total = correct + incorrect;
@@ -339,6 +439,20 @@ function showResults(score) {
 window.restartExercise = () => {
     document.getElementById('resultsOverlay').style.display = 'none';
 };
+
+// NEW: Обработчик кнопки пропуска калибровки
+document.getElementById('skipCalibrationBtn')?.addEventListener('click', function() {
+    if (currentExercise && currentExercise.name === 'pushup') {
+        // Устанавливаем дефолтные значения для отжиманий
+        currentExercise.thresholds.elbowDown = 90;
+        currentExercise.thresholds.elbowUp = 160;
+        exerciseState.calibrationStep = 3;
+        
+        calibrationActive = false;
+        document.getElementById('calibrationScreen').style.display = 'none';
+        startExerciseCountdown();
+    }
+});
 
 document.getElementById('startCamBtn').onclick = startCamera;
 document.getElementById('recordBtn').onclick = toggleRecording;
