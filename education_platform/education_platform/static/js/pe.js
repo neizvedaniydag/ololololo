@@ -312,30 +312,31 @@ function startExercise() {
     plankTime = 0;
     updateUI();
 
-    // NEW: Проверка нужна ли калибровка (только для pushup)
+    // ТОЛЬКО ДЛЯ ОТЖИМАНИЙ - КАЛИБРОВКА
     if (currentExercise.name === 'pushup') {
         calibrationActive = true;
+        recording = false; // ВАЖНО: НЕ ВКЛЮЧАТЬ ПОДСЧЕТ!
         document.getElementById('calibrationScreen').style.display = 'flex';
         document.getElementById('overlayControls').style.display = 'flex';
         
-        // Активируем первый шаг
-        document.getElementById('calibStep1').classList.add('active');
+        // Сбрасываем UI
+        document.getElementById('calibStep1').classList.remove('active', 'completed');
         document.getElementById('calibStep2').classList.remove('active', 'completed');
         document.getElementById('calibStep3').classList.remove('active', 'completed');
-        
-        // Сбрасываем прогресс
         document.getElementById('calibProgressBar').style.width = '0%';
         document.getElementById('calibProgressText').textContent = '0%';
-        document.getElementById('calibInstruction').innerHTML = 
-            '<strong>Встаньте в упор лёжа для начала калибровки</strong>';
+        document.getElementById('calibInstruction').innerHTML = 'Встаньте в упор лёжа для начала калибровки';
         document.getElementById('calibElbowAngle').textContent = '--°';
         document.getElementById('calibBodyAngle').textContent = '--°';
+        
+        console.log('=== КАЛИБРОВКА ЗАПУЩЕНА ===');
     } else {
-        // Для всех остальных упражнений - обычный запуск
+        // Для остальных упражнений
         calibrationActive = false;
         startExerciseCountdown();
     }
 }
+
 
 // NEW: Отдельная функция для запуска отсчета (чтобы использовать после калибровки)
 function startExerciseCountdown() {
