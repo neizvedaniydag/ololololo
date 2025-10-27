@@ -19,7 +19,6 @@ export const pushup = {
     },
 
     thresholds: {
-        // Будут установлены после калибровки
         elbowDown: null,
         elbowUp: null
     },
@@ -27,7 +26,7 @@ export const pushup = {
     getInitialState() {
         return { 
             position: 'up',
-            calibrationStep: 0,  // 0=не начата, 1=нижняя точка, 2=верхняя точка, 3=готово
+            calibrationStep: 0,
             calibrationSamples: [],
             calibratedMin: null,
             calibratedMax: null
@@ -39,20 +38,35 @@ export const pushup = {
         const elbowRight = calcAngle(lm[12], lm[14], lm[16]);
         const elbow = Math.round((elbowLeft + elbowRight) / 2);
 
+        // ========== ПРОВЕРКА ПОЛОЖЕНИЯ ТЕЛА ==========
+        // Проверяем что тело горизонтально (в позиции для отжиманий)
+        const shoulderY = (lm[11].y + lm[12].y) / 2;  // Плечи
+        const hipY = (lm[23].y + lm[24].y) / 2;       // Бёдра
+        const noseY = lm[0].y;                         // Нос
+        
+        // Разница по высоте между плечами и бёдрами должна быть небольшой
+        const bodyHeightDiff = Math.abs(shoulderY - hipY);
+        
+        // Нос должен быть выше бёдер (человек не стоит вертикально)
+        const isHorizontal = bodyHeightDiff < 0.15 && noseY < hipY;
+
         let result = { counted: false, correct: false, status: '' };
 
-        // ========== РЕЖИМ КАЛИБРОВКИ ==========
+        // ========== КАЛИБРОВКА ==========
         if (state.calibrationStep < 3) {
+            if (!isHorizontal) {
+                result.status = '⚠️ Встаньте в упор лёжа (планку)! Тело должно быть горизонтально';
+                showHint('Встаньте в планку!', this.svgIcons.bodyStraight, 'rgba(239, 68, 68, 0.95)');
+                return result;
+            }
+
             if (state.calibrationStep === 0) {
-                // ШАГ 1: Инструкция для нижней точки
                 result.status = '📍 КАЛИБРОВКА: Опуститесь грудью к полу и держите 3 сек';
                 showHint(`Опуститесь вниз! Угол: ${elbow}°`, this.svgIcons.bodyDown, 'rgba(59, 130, 246, 0.95)');
                 
-                // Собираем образцы
                 state.calibrationSamples.push(elbow);
                 
-                if (state.calibrationSamples.length >= 60) {  // ~2 секунды при 30 FPS
-                    // Берём медианное значение (игнорируем выбросы)
+                if (state.calibrationSamples.length >= 60) {
                     const sorted = state.calibrationSamples.sort((a, b) => a - b);
                     state.calibratedMin = sorted[Math.floor(sorted.length / 2)];
                     state.calibrationSamples = [];
@@ -60,7 +74,6 @@ export const pushup = {
                 }
             }
             else if (state.calibrationStep === 1) {
-                // ШАГ 2: Инструкция для верхней точки
                 result.status = '📍 КАЛИБРОВКА: Выпрямите руки полностью и держите 3 сек';
                 showHint(`Выпрямите руки! Угол: ${elbow}°`, this.svgIcons.bodyUp, 'rgba(59, 130, 246, 0.95)');
                 
@@ -71,7 +84,6 @@ export const pushup = {
                     state.calibratedMax = sorted[Math.floor(sorted.length / 2)];
                     state.calibrationSamples = [];
                     
-                    // Вычисляем пороги с отступом 15%
                     const range = state.calibratedMax - state.calibratedMin;
                     this.thresholds.elbowDown = state.calibratedMin + Math.round(range * 0.3);
                     this.thresholds.elbowUp = state.calibratedMax - Math.round(range * 0.15);
@@ -80,11 +92,9 @@ export const pushup = {
                 }
             }
             else if (state.calibrationStep === 2) {
-                // ШАГ 3: Показать результаты
                 result.status = `✅ Калибровка завершена! Низ: ${state.calibratedMin}°, Верх: ${state.calibratedMax}°`;
                 showHint('✅ Калибровка готова! Начинайте!', this.svgIcons.check, 'rgba(16, 185, 129, 0.95)');
                 
-                // Через 2 секунды начать упражнение
                 setTimeout(() => {
                     state.calibrationStep = 3;
                 }, 2000);
@@ -93,8 +103,15 @@ export const pushup = {
             return result;
         }
 
-        // ========== ОБЫЧНЫЙ РЕЖИМ (ПОСЛЕ КАЛИБРОВКИ) ==========
+        // ========== ОБЫЧНЫЙ РЕЖИМ ==========
         
+        // БЛОКИРОВКА: Если тело не горизонтально - НЕ СЧИТАЕМ!
+        if (!isHorizontal) {
+            result.status = '⚠️ Встаньте в упор лёжа! Не считается';
+            showHint('Примите правильное положение!', this.svgIcons.bodyStraight, 'rgba(239, 68, 68, 0.95)');
+            return result;
+        }
+
         // ОПУСКАНИЕ
         if (state.position === 'up' && elbow < this.thresholds.elbowDown) {
             state.position = 'down';
