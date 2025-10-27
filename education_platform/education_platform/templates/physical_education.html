@@ -87,6 +87,54 @@
                 <button id="startExerciseBtn" class="start-camera-btn">Начать</button>
             </div>
         </div>
+<!-- ДОБАВИТЬ ПОСЛЕ instructionsScreen -->
+<div class="calibration-screen" id="calibrationScreen" style="display: none;">
+    <div class="calibration-content">
+        <div class="calibration-header">
+            <h2>Калибровка</h2>
+            <p class="calibration-subtitle">Настройка под ваш диапазон движения</p>
+        </div>
+        
+        <div class="calibration-steps">
+            <div class="calibration-step" id="calibStep1">
+                <div class="step-icon">1</div>
+                <div class="step-text">Опуститесь вниз</div>
+            </div>
+            <div class="calibration-step" id="calibStep2">
+                <div class="step-icon">2</div>
+                <div class="step-text">Выпрямите руки</div>
+            </div>
+            <div class="calibration-step" id="calibStep3">
+                <div class="step-icon">✓</div>
+                <div class="step-text">Готово</div>
+            </div>
+        </div>
+
+        <div class="calibration-progress">
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="calibProgressBar"></div>
+            </div>
+            <div class="progress-text" id="calibProgressText">0%</div>
+        </div>
+
+        <div class="calibration-instruction" id="calibInstruction">
+            Встаньте в упор лёжа для начала
+        </div>
+
+        <div class="calibration-metrics">
+            <div class="metric-item">
+                <span class="metric-label">Угол локтя:</span>
+                <span class="metric-value" id="calibElbowAngle">--°</span>
+            </div>
+            <div class="metric-item">
+                <span class="metric-label">Угол тела:</span>
+                <span class="metric-value" id="calibBodyAngle">--°</span>
+            </div>
+        </div>
+
+        <button id="skipCalibrationBtn" class="skip-calib-btn">Пропустить калибровку</button>
+    </div>
+</div>
 
         <div class="results-overlay" id="resultsOverlay" style="display: none;">
             <div class="results-content">
