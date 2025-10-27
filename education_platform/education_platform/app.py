@@ -109,6 +109,11 @@ def tests():
     user_tests = TestResult.query.filter_by(user_id=current_user.id).order_by(TestResult.created_at.desc()).all()
     return render_template('tests.html', tests=user_tests)
 
+@app.route('/privacy-policy')
+def privacy_policy():
+    return render_template('privacy_policy.html')
+
+
 # API ГЕНЕРАЦИИ ТЕСТА
 @app.route('/api/generate-test', methods=['POST'])
 @login_required
