@@ -34,7 +34,7 @@ export const pushup = {
 
         let result = { counted: false, correct: false, status: '' };
 
-        // ОПУСКАНИЕ - только если РЕАЛЬНО согнули руки
+        // ОПУСКАНИЕ - только если РЕАЛЬНО согнули руки 
         if (state.position === 'up' && elbow < this.thresholds.elbowDown) {
             state.position = 'down';
             result.counted = true;
