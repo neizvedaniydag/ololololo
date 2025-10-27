@@ -42,7 +42,7 @@ export const pushup = {
             result.correct = true;
             result.status = `✅ ЗАЧЁТ! Угол был: ${elbow}°`;
             showHint('✅ ОТЛИЧНО!', this.svgIcons.check, 'rgba(16, 185, 129, 0.95)');
-        } 
+        }  
         else if (state.position === 'down' && elbow > this.thresholds.elbowUp) {
             // ПОДНЯЛИСЬ
             state.position = 'up';
