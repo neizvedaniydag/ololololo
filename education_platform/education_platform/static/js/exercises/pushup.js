@@ -19,44 +19,92 @@ export const pushup = {
     },
 
     thresholds: {
-        elbowAngleDown: 80,     // Угол локтя при опускании
-        elbowAngleUp: 160,      // Угол локтя при подъеме
-        elbowAngleGood: 50,     // Хороший угол опускания
-        bodyAngleMin: 155,      // Минимальный угол тела
-        bodyAngleMax: 195       // Максимальный угол тела
+        // Угол локтя при опускании (нижняя точка) - должен быть 70-100 градусов
+        elbowAngleDownMin: 70,    // Минимальный угол (слишком глубоко если меньше)
+        elbowAngleDownMax: 105,   // Максимальный угол для засчитывания (недостаточно если больше)
+        elbowAngleGoodMax: 95,    // Идеальная глубина (70-95 градусов)
+        
+        // Угол локтя при подъеме (верхняя точка)
+        elbowAngleUp: 160,        // Руки почти полностью выпрямлены
+        
+        // Угол тела (прямая линия от плеча через бедро к колену)
+        bodyAngleMin: 160,        // Минимальный угол (тело прогнуто если меньше)
+        bodyAngleMax: 195         // Максимальный угол (таз поднят если больше)
     },
 
     getInitialState() {
-        return { position: 'up' };
+        return { position: 'up', lastCorrect: false };
     },
 
     analyze(lm, state, showHint, logError, calcAngle) {
+        // Вычисляем средний угол локтей (левый и правый)
         const elbow = (calcAngle(lm[11], lm[13], lm[15]) + calcAngle(lm[12], lm[14], lm[16])) / 2;
-        const bodyAngle = calcAngle(lm[11], lm[23], lm[25]);
+        
+        // Вычисляем угол тела (плечо-бедро-колено) для проверки прямой линии
+        const bodyAngle = (calcAngle(lm[11], lm[23], lm[25]) + calcAngle(lm[12], lm[24], lm[26])) / 2;
 
         let result = { counted: false, correct: false, status: 'Готов' };
 
-        if (elbow < this.thresholds.elbowAngleDown && state.position === 'up') {
+        // ========== ФАЗА ОПУСКАНИЯ (вниз) ==========
+        if (elbow < this.thresholds.elbowAngleDownMax && state.position === 'up') {
             state.position = 'down';
             result.counted = true;
+            result.status = 'Отжимание';
 
-            if (elbow > this.thresholds.elbowAngleGood) {
-                showHint('Опускайтесь НИЖЕ! Грудь к полу', this.svgIcons.bodyDown);
+            // Проверка 1: Тело держится прямо?
+            if (bodyAngle < this.thresholds.bodyAngleMin) {
+                showHint('Не прогибайте спину! Держите тело ПРЯМО', this.svgIcons.bodyStraight);
+                logError('Прогиб в пояснице');
+                result.correct = false;
+                state.lastCorrect = false;
+            } 
+            else if (bodyAngle > this.thresholds.bodyAngleMax) {
+                showHint('Опустите таз! Тело должно быть ПРЯМЫМ', this.svgIcons.bodyStraight);
+                logError('Таз слишком высоко');
+                result.correct = false;
+                state.lastCorrect = false;
+            }
+            // Проверка 2: Недостаточная глубина?
+            else if (elbow > this.thresholds.elbowAngleGoodMax) {
+                showHint('Опускайтесь ГЛУБЖЕ! Локти до 90°', this.svgIcons.bodyDown);
                 logError('Недостаточная глубина отжимания');
                 result.correct = false;
-            } else if (bodyAngle < this.thresholds.bodyAngleMin || bodyAngle > this.thresholds.bodyAngleMax) {
-                showHint('Держите тело ПРЯМО!', this.svgIcons.bodyStraight);
-                logError('Тело не прямое');
-                result.correct = false;
-            } else {
-                showHint('Идеально! Выпрямите руки', this.svgIcons.bodyUp, 'rgba(16, 185, 129, 0.95)');
-                result.correct = true;
+                state.lastCorrect = false;
             }
-            result.status = 'Отжимание';
-        } else if (elbow > this.thresholds.elbowAngleUp && state.position === 'down') {
+            // Проверка 3: Слишком глубоко (физически почти невозможно, скорее ошибка детекции)
+            else if (elbow < this.thresholds.elbowAngleDownMin) {
+                showHint('Проверьте положение камеры', this.svgIcons.bodyDown);
+                logError('Ошибка определения положения');
+                result.correct = false;
+                state.lastCorrect = false;
+            }
+            // ВСЕ ОТЛИЧНО!
+            else {
+                showHint('Отлично! Теперь выпрямите руки', this.svgIcons.bodyUp, 'rgba(16, 185, 129, 0.95)');
+                result.correct = true;
+                state.lastCorrect = true;
+            }
+        } 
+        // ========== ФАЗА ПОДЪЕМА (вверх) ==========
+        else if (elbow > this.thresholds.elbowAngleUp && state.position === 'down') {
             state.position = 'up';
-            showHint('Готов к следующему', this.svgIcons.bodyDown);
+            
+            // Показываем статус в зависимости от предыдущего отжимания
+            if (state.lastCorrect) {
+                showHint('Готов к следующему!', this.svgIcons.check, 'rgba(16, 185, 129, 0.95)');
+            } else {
+                showHint('Готов. Исправьте технику', this.svgIcons.bodyDown, 'rgba(245, 158, 11, 0.95)');
+            }
             result.status = 'Готов';
+        }
+        // ========== ПРОМЕЖУТОЧНЫЕ СОСТОЯНИЯ ==========
+        else {
+            // Показываем текущее состояние
+            if (state.position === 'up') {
+                result.status = 'Опускайтесь вниз';
+            } else {
+                result.status = 'Выпрямляйте руки';
+            }
         }
 
         return result;
