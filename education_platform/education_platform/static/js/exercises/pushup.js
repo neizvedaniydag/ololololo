@@ -19,12 +19,19 @@ export const pushup = {
     },
 
     thresholds: {
-        elbowDown: 130,    // Опускание - нужно РЕАЛЬНО согнуть руки
-        elbowUp: 160       // Подъём - нужно РЕАЛЬНО выпрямить (большая разница!)
+        // Будут установлены после калибровки
+        elbowDown: null,
+        elbowUp: null
     },
 
     getInitialState() {
-        return { position: 'up' };
+        return { 
+            position: 'up',
+            calibrationStep: 0,  // 0=не начата, 1=нижняя точка, 2=верхняя точка, 3=готово
+            calibrationSamples: [],
+            calibratedMin: null,
+            calibratedMax: null
+        };
     },
 
     analyze(lm, state, showHint, logError, calcAngle) {
@@ -34,7 +41,61 @@ export const pushup = {
 
         let result = { counted: false, correct: false, status: '' };
 
-        // ОПУСКАНИЕ - только если РЕАЛЬНО согнули руки 
+        // ========== РЕЖИМ КАЛИБРОВКИ ==========
+        if (state.calibrationStep < 3) {
+            if (state.calibrationStep === 0) {
+                // ШАГ 1: Инструкция для нижней точки
+                result.status = '📍 КАЛИБРОВКА: Опуститесь грудью к полу и держите 3 сек';
+                showHint(`Опуститесь вниз! Угол: ${elbow}°`, this.svgIcons.bodyDown, 'rgba(59, 130, 246, 0.95)');
+                
+                // Собираем образцы
+                state.calibrationSamples.push(elbow);
+                
+                if (state.calibrationSamples.length >= 60) {  // ~2 секунды при 30 FPS
+                    // Берём медианное значение (игнорируем выбросы)
+                    const sorted = state.calibrationSamples.sort((a, b) => a - b);
+                    state.calibratedMin = sorted[Math.floor(sorted.length / 2)];
+                    state.calibrationSamples = [];
+                    state.calibrationStep = 1;
+                }
+            }
+            else if (state.calibrationStep === 1) {
+                // ШАГ 2: Инструкция для верхней точки
+                result.status = '📍 КАЛИБРОВКА: Выпрямите руки полностью и держите 3 сек';
+                showHint(`Выпрямите руки! Угол: ${elbow}°`, this.svgIcons.bodyUp, 'rgba(59, 130, 246, 0.95)');
+                
+                state.calibrationSamples.push(elbow);
+                
+                if (state.calibrationSamples.length >= 60) {
+                    const sorted = state.calibrationSamples.sort((a, b) => a - b);
+                    state.calibratedMax = sorted[Math.floor(sorted.length / 2)];
+                    state.calibrationSamples = [];
+                    
+                    // Вычисляем пороги с отступом 15%
+                    const range = state.calibratedMax - state.calibratedMin;
+                    this.thresholds.elbowDown = state.calibratedMin + Math.round(range * 0.3);
+                    this.thresholds.elbowUp = state.calibratedMax - Math.round(range * 0.15);
+                    
+                    state.calibrationStep = 2;
+                }
+            }
+            else if (state.calibrationStep === 2) {
+                // ШАГ 3: Показать результаты
+                result.status = `✅ Калибровка завершена! Низ: ${state.calibratedMin}°, Верх: ${state.calibratedMax}°`;
+                showHint('✅ Калибровка готова! Начинайте!', this.svgIcons.check, 'rgba(16, 185, 129, 0.95)');
+                
+                // Через 2 секунды начать упражнение
+                setTimeout(() => {
+                    state.calibrationStep = 3;
+                }, 2000);
+            }
+            
+            return result;
+        }
+
+        // ========== ОБЫЧНЫЙ РЕЖИМ (ПОСЛЕ КАЛИБРОВКИ) ==========
+        
+        // ОПУСКАНИЕ
         if (state.position === 'up' && elbow < this.thresholds.elbowDown) {
             state.position = 'down';
             result.counted = true;
@@ -42,7 +103,7 @@ export const pushup = {
             result.status = `✅ ЗАСЧИТАНО! (${elbow}°)`;
             showHint('✅ ОТЛИЧНО!', this.svgIcons.check, 'rgba(16, 185, 129, 0.95)');
         } 
-        // ПОДЪЁМ - только если РЕАЛЬНО выпрямили
+        // ПОДЪЁМ
         else if (state.position === 'down' && elbow > this.thresholds.elbowUp) {
             state.position = 'up';
             result.status = `Готов! (${elbow}°)`;
@@ -51,9 +112,9 @@ export const pushup = {
         // ПРОМЕЖУТОЧНОЕ
         else {
             if (state.position === 'up') {
-                result.status = `⬇️ Опускайтесь! ${elbow}° (нужно <130°)`;
+                result.status = `⬇️ Опускайтесь! ${elbow}° (нужно <${this.thresholds.elbowDown}°)`;
             } else {
-                result.status = `⬆️ Выпрямляйтесь! ${elbow}° (нужно >160°)`;
+                result.status = `⬆️ Выпрямляйтесь! ${elbow}° (нужно >${this.thresholds.elbowUp}°)`;
             }
         }
 
