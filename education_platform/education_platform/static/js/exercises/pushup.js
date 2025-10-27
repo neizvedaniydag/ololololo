@@ -78,7 +78,7 @@ export const pushup = {
             // ВСЁ ОТЛИЧНО
             else {
                 showHint(`ОТЛИЧНО! (${Math.round(elbow)}°)`, this.svgIcons.check, 'rgba(16, 185, 129, 0.95)');
-                result.correct = true;
+                result.correct = true; 
             }
         }
         // ==== ПОДЪЁМ ====
