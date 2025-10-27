@@ -50,9 +50,16 @@ def register():
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
+        # Проверка согласия
+        if not request.form.get('privacy_consent'):
+            flash('Необходимо согласие на обработку персональных данных', 'error')
+            return redirect(url_for('register'))
+        
         username = request.form.get('username')
         email = request.form.get('email')
         password = request.form.get('password')
+        
+
 
         if User.query.filter_by(email=email).first():
             flash('Email уже используется', 'error')
