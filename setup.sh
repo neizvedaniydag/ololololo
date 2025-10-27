@@ -68,15 +68,54 @@ else
 fi
 echo
 
-# ============ ШАГ 3: ОЧИСТКА DOCKER (БЕЗ УДАЛЕНИЯ БД) ============
-echoc "3. Очистка Docker (БД сохраняется)..." $C_BLUE
+# ============ ШАГ 3: ПРОВЕРКА СУЩЕСТВУЮЩИХ СЕРТИФИКАТОВ ============
+echoc "3. Проверка существующих SSL сертификатов..." $C_BLUE
+
+CERT_EXISTS=false
+EXISTING_DOMAIN=""
+EXISTING_EMAIL=""
+
+# Проверяем наличие volume с сертификатами
+if docker volume ls | grep -q "certbot_certs"; then
+    echoc "   → Найден volume с сертификатами, проверяю..." $C_YELLOW
+    
+    # Получаем список сертификатов через временный контейнер
+    CERT_INFO=$($DC run --rm certbot certificates 2>/dev/null | grep -A 5 "Certificate Name:" || echo "")
+    
+    if [ ! -z "$CERT_INFO" ]; then
+        # Извлекаем домен и email из вывода certbot
+        EXISTING_DOMAIN=$(echo "$CERT_INFO" | grep "Domains:" | head -n1 | awk '{print $2}' | cut -d',' -f1)
+        EXISTING_EMAIL=$(echo "$CERT_INFO" | grep "Email:" | head -n1 | awk '{print $2}')
+        
+        # Проверяем срок действия
+        EXPIRY=$(echo "$CERT_INFO" | grep "Expiry Date:" | head -n1 | awk '{print $3}')
+        DAYS_LEFT=$(echo "$CERT_INFO" | grep "Valid:" | head -n1 | grep -oP '\d+(?= days)')
+        
+        if [ ! -z "$DAYS_LEFT" ] && [ "$DAYS_LEFT" -gt 0 ]; then
+            CERT_EXISTS=true
+            echoc "   ✓ Найден действующий сертификат!" $C_GREEN
+            echoc "   • Домен: ${EXISTING_DOMAIN}" $C_RESET
+            echoc "   • Email: ${EXISTING_EMAIL}" $C_RESET
+            echoc "   • Осталось дней: ${DAYS_LEFT}" $C_RESET
+            echoc "   • Истекает: ${EXPIRY}" $C_RESET
+        fi
+    fi
+fi
+
+if [ "$CERT_EXISTS" = false ]; then
+    echoc "   → Действующих сертификатов не найдено" $C_YELLOW
+fi
+echo
+
+# ============ ШАГ 4: ОЧИСТКА DOCKER (БЕЗ УДАЛЕНИЯ БД И СЕРТИФИКАТОВ) ============
+echoc "4. Очистка Docker (БД и сертификаты сохраняются)..." $C_BLUE
 $DC down --remove-orphans 2>/dev/null || true
 docker system prune -f 2>/dev/null || true
 echoc "   ✓ Старые контейнеры удалены" $C_GREEN
 echo
 
-# ============ ШАГ 4: ИСПРАВЛЕНИЕ DOCKER-COMPOSE.YML ============
-echoc "4. Проверка и исправление docker-compose.yml..." $C_BLUE
+# ============ ШАГ 5: ИСПРАВЛЕНИЕ DOCKER-COMPOSE.YML ============
+echoc "5. Проверка и исправление docker-compose.yml..." $C_BLUE
 
 if [ -f "docker-compose.yml" ]; then
     # Удалить строку version
@@ -88,7 +127,6 @@ if [ -f "docker-compose.yml" ]; then
     # Проверить restart: always
     if ! grep -q "restart: always" docker-compose.yml; then
         echoc "   ⚠ Добавляю 'restart: always' для автозапуска 24/7..." $C_YELLOW
-        # Добавить после каждого service
         sed -i '/web:/a\    restart: always' docker-compose.yml
         sed -i '/nginx:/a\    restart: always' docker-compose.yml
         echoc "   ✓ Контейнеры будут работать 24/7" $C_GREEN
@@ -100,13 +138,24 @@ else
 fi
 echo
 
-# ============ ШАГ 5: СБОР ДАННЫХ ============
-echoc "5. Сбор информации..." $C_BLUE
-read -p "   Домен (например, my-site.ru): " DOMAIN
-[ -z "$DOMAIN" ] && error_exit "Домен не может быть пустым"
+# ============ ШАГ 6: СБОР ДАННЫХ (ТОЛЬКО ЕСЛИ НЕТ СЕРТИФИКАТА) ============
+echoc "6. Сбор информации..." $C_BLUE
 
-read -p "   Email для Let's Encrypt: " EMAIL
-[ -z "$EMAIL" ] && error_exit "Email не может быть пустым"
+if [ "$CERT_EXISTS" = true ]; then
+    # Используем существующие данные
+    DOMAIN="$EXISTING_DOMAIN"
+    EMAIL="$EXISTING_EMAIL"
+    echoc "   ✓ Используются данные из существующего сертификата" $C_GREEN
+    echoc "   • Домен: ${DOMAIN}" $C_RESET
+    echoc "   • Email: ${EMAIL}" $C_RESET
+else
+    # Запрашиваем новые данные
+    read -p "   Домен (например, my-site.ru): " DOMAIN
+    [ -z "$DOMAIN" ] && error_exit "Домен не может быть пустым"
+
+    read -p "   Email для Let's Encrypt: " EMAIL
+    [ -z "$EMAIL" ] && error_exit "Email не может быть пустым"
+fi
 
 echoc "   Вставьте API-ключ GigaChat полностью:" $C_YELLOW
 read -p "   API-ключ: " GIGACHAT_CREDENTIALS
@@ -122,8 +171,8 @@ else
 fi
 echo
 
-# ============ ШАГ 6: СОЗДАНИЕ КОНФИГУРАЦИИ ============
-echoc "6. Создание конфигурации..." $C_BLUE
+# ============ ШАГ 7: СОЗДАНИЕ КОНФИГУРАЦИИ ============
+echoc "7. Создание конфигурации..." $C_BLUE
 
 SECRET_KEY=$(openssl rand -hex 32)
 cat > .env <<EOL
@@ -132,7 +181,6 @@ GIGACHAT_CREDENTIALS=${GIGACHAT_CREDENTIALS}
 FLASK_APP=app.py
 EOL
 
-# Очистка от пробелов в конце строк
 sed -i 's/[[:space:]]*$//' .env
 echoc "   ✓ Файл .env создан и очищен" $C_GREEN
 
@@ -185,8 +233,8 @@ fi
 echoc "   ✓ Конфигурация создана" $C_GREEN
 echo
 
-# ============ ШАГ 7: ПРОВЕРКА DNS ============
-echoc "7. Проверка DNS..." $C_BLUE
+# ============ ШАГ 8: ПРОВЕРКА DNS ============
+echoc "8. Проверка DNS..." $C_BLUE
 PUBLIC_IP=$(curl -s http://ipinfo.io/ip || echo "unknown")
 DOMAIN_IP=$(dig +short $DOMAIN @8.8.8.8 | head -n1 || echo "unknown")
 echoc "   IP сервера: ${PUBLIC_IP}" $C_YELLOW
@@ -201,39 +249,46 @@ else
 fi
 echo
 
-# ============ ШАГ 8: SSL СЕРТИФИКАТ (STANDALONE) ============
-echoc "8. Получение SSL сертификата..." $C_BLUE
+# ============ ШАГ 9: SSL СЕРТИФИКАТ ============
+echoc "9. Управление SSL сертификатом..." $C_BLUE
 
-echoc "   → Удаление старых сертификатов..." $C_YELLOW
-docker volume rm ololololo_certbot_certs 2>/dev/null || true
-
-echoc "   → Получение SSL (standalone метод)..." $C_YELLOW
-$DC run --rm -p 80:80 --entrypoint "\
-  certbot certonly --standalone \
-    --email $EMAIL \
-    -d $DOMAIN \
-    -d www.$DOMAIN \
-    --rsa-key-size 4096 \
-    --agree-tos \
-    --non-interactive \
-    --force-renewal" certbot 2>&1 | grep -E "Success|Certificate|saved" || {
-    echoc "   ⚠ Ошибка получения SSL" $C_RED
-    read -p "   Продолжить без SSL? (y/N) " cont_no_ssl
-    [ "$cont_no_ssl" != "y" ] && [ "$cont_no_ssl" != "Y" ] && error_exit "Прервано"
-}
-
-echoc "   ✓ SSL сертификат получен!" $C_GREEN
+if [ "$CERT_EXISTS" = true ]; then
+    echoc "   ✓ Сертификат уже существует, пропускаю получение" $C_GREEN
+    echoc "   → Проверка необходимости обновления..." $C_YELLOW
+    
+    # Попытка обновить сертификат (certbot renew безопасно проверит срок)
+    $DC run --rm certbot renew --quiet 2>&1 | grep -q "No renewals" && \
+        echoc "   ✓ Сертификат актуален, обновление не требуется" $C_GREEN || \
+        echoc "   ✓ Сертификат обновлён" $C_GREEN
+else
+    echoc "   → Получение нового SSL сертификата (standalone)..." $C_YELLOW
+    
+    $DC run --rm -p 80:80 --entrypoint "\
+      certbot certonly --standalone \
+        --email $EMAIL \
+        -d $DOMAIN \
+        -d www.$DOMAIN \
+        --rsa-key-size 4096 \
+        --agree-tos \
+        --non-interactive" certbot 2>&1 | grep -E "Success|Certificate|saved" || {
+        echoc "   ⚠ Ошибка получения SSL" $C_RED
+        read -p "   Продолжить без SSL? (y/N) " cont_no_ssl
+        [ "$cont_no_ssl" != "y" ] && [ "$cont_no_ssl" != "Y" ] && error_exit "Прервано"
+    }
+    
+    echoc "   ✓ SSL сертификат получен!" $C_GREEN
+fi
 echo
 
-# ============ ШАГ 9: ЗАПУСК КОНТЕЙНЕРОВ ============
-echoc "9. Запуск сервисов..." $C_BLUE
+# ============ ШАГ 10: ЗАПУСК КОНТЕЙНЕРОВ ============
+echoc "10. Запуск сервисов..." $C_BLUE
 $DC up -d --build --remove-orphans 2>&1 | tail -5
 sleep 5
 echoc "   ✓ Контейнеры запущены" $C_GREEN
 echo
 
-# ============ ШАГ 10: ПРОВЕРКА ============
-echoc "10. Финальная проверка..." $C_BLUE
+# ============ ШАГ 11: ПРОВЕРКА ============
+echoc "11. Финальная проверка..." $C_BLUE
 echoc ""
 $DC ps
 echo
@@ -245,13 +300,12 @@ else
     echoc "   ⚠ API ключ не найден в контейнере!" $C_RED
 fi
 
-# Проверка логов Flask
 echoc "   → Проверка логов Flask (последние 10 строк)..." $C_YELLOW
 $DC logs web 2>&1 | tail -10 | grep -i "error\|fail" && echoc "   ⚠ Есть ошибки в логах" $C_RED || echoc "   ✓ Логи чистые" $C_GREEN
 echo
 
-# ============ ШАГ 11: НАСТРОЙКА АВТОМОНИТОРИНГА ============
-echoc "11. Настройка автомониторинга и автообновления SSL..." $C_BLUE
+# ============ ШАГ 12: НАСТРОЙКА АВТОМОНИТОРИНГА ============
+echoc "12. Настройка автомониторинга и автообновления SSL..." $C_BLUE
 
 CRON_CHECK_CONTAINERS="*/5 * * * * docker compose -f $(pwd)/docker-compose.yml ps | grep -q 'Up' || docker compose -f $(pwd)/docker-compose.yml up -d >> /var/log/docker-autostart.log 2>&1"
 CRON_SSL_RENEWAL="0 1,13 * * * cd $(pwd) && docker compose run --rm certbot renew && docker compose exec nginx nginx -s reload >> /var/log/ssl-renewal.log 2>&1"
@@ -270,7 +324,11 @@ echoc "=================================================================" $C_BLU
 echo
 echoc "🌐 Ваш сайт: https://${DOMAIN}" $C_YELLOW
 echoc "📧 Email: ${EMAIL}" $C_RESET
-echoc "🔐 SSL действителен до: $(date -d '+90 days' '+%Y-%m-%d' 2>/dev/null || date -v+90d '+%Y-%m-%d')" $C_RESET
+if [ "$CERT_EXISTS" = true ]; then
+    echoc "🔐 SSL: Используется существующий сертификат (${DAYS_LEFT} дней до истечения)" $C_GREEN
+else
+    echoc "🔐 SSL действителен до: $(date -d '+90 days' '+%Y-%m-%d' 2>/dev/null || date -v+90d '+%Y-%m-%d')" $C_RESET
+fi
 echoc "🔄 Автоматический перезапуск: ВКЛЮЧЕН (24/7)" $C_GREEN
 echoc "📊 База данных: СОХРАНЯЕТСЯ между перезапусками" $C_GREEN
 echo
@@ -283,6 +341,7 @@ echoc "  Остановить всё:      $DC down" $C_RESET
 echoc "  Запустить заново:    $DC up -d" $C_RESET
 echoc "  Бэкап БД:            docker cp education-platform-app:/app/instance/education_platform.db ./backup.db" $C_RESET
 echoc "  Проверить ресурсы:   docker stats" $C_RESET
+echoc "  Проверить SSL:       $DC run --rm certbot certificates" $C_RESET
 echo
 echoc "📋 Логи автомониторинга:" $C_BLUE
 echoc "  Автозапуск:          tail -f /var/log/docker-autostart.log" $C_RESET
