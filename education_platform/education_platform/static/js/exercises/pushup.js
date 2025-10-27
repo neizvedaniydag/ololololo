@@ -19,8 +19,8 @@ export const pushup = {
     },
 
     thresholds: {
-        elbowDown: 165,   
-        elbowUp: 170      
+        elbowDown: 130,    // Опускание - нужно РЕАЛЬНО согнуть руки
+        elbowUp: 160       // Подъём - нужно РЕАЛЬНО выпрямить (большая разница!)
     },
 
     getInitialState() {
@@ -34,27 +34,26 @@ export const pushup = {
 
         let result = { counted: false, correct: false, status: '' };
 
-        // ЛОГИКА
+        // ОПУСКАНИЕ - только если РЕАЛЬНО согнули руки
         if (state.position === 'up' && elbow < this.thresholds.elbowDown) {
-            // ЗАСЧИТАЛИ!
             state.position = 'down';
             result.counted = true;
             result.correct = true;
-            result.status = `✅ ЗАЧЁТ! Угол был: ${elbow}°`;
+            result.status = `✅ ЗАСЧИТАНО! (${elbow}°)`;
             showHint('✅ ОТЛИЧНО!', this.svgIcons.check, 'rgba(16, 185, 129, 0.95)');
-        }  
+        } 
+        // ПОДЪЁМ - только если РЕАЛЬНО выпрямили
         else if (state.position === 'down' && elbow > this.thresholds.elbowUp) {
-            // ПОДНЯЛИСЬ
             state.position = 'up';
-            result.status = `Готов! Текущий угол: ${elbow}°`;
+            result.status = `Готов! (${elbow}°)`;
             showHint('Готов к следующему', this.svgIcons.bodyDown);
         }
+        // ПРОМЕЖУТОЧНОЕ
         else {
-            // ПРОМЕЖУТОЧНОЕ СОСТОЯНИЕ - ПОКАЗЫВАЕМ УГОЛ
             if (state.position === 'up') {
-                result.status = `⬇️ Опускайтесь! Угол: ${elbow}° (надо <165°)`;
+                result.status = `⬇️ Опускайтесь! ${elbow}° (нужно <130°)`;
             } else {
-                result.status = `⬆️ Выпрямляйтесь! Угол: ${elbow}° (надо >170°)`;
+                result.status = `⬆️ Выпрямляйтесь! ${elbow}° (нужно >160°)`;
             }
         }
 
