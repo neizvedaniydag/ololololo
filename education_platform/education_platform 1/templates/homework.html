@@ -62,7 +62,7 @@
                 <p>{{ hw.description }}</p>
                 {% endif %}
                 <div class="hw-actions">
-                    <a href="{{ url_for('toggle_homework', hw_id=hw.id) }}" 
+                    <a href="{{ url_for('toggle_homework', hw_id=hw.id) }}"
                        class="btn-small {% if hw.completed %}btn-secondary{% else %}btn-success{% endif %}">
                         {% if hw.completed %}
                             ↩️ Вернуть в работу

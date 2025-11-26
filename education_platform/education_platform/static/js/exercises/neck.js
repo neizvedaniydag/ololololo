@@ -2,9 +2,9 @@ export const neck = {
     name: 'neck',
     title: 'Повороты шеи',
     defaultReps: 10,
-
+    
     instructions: [
-        {
+        { 
             text: 'Сядьте или встаньте прямо, расслабьте плечи',
             svg: `<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="5" r="3" fill="#4CAF50"/>
@@ -15,7 +15,7 @@ export const neck = {
                 <path d="M12 10 L16 13" stroke="#4CAF50"/>
             </svg>`
         },
-        {
+        { 
             text: 'Медленно поверните голову ВЛЕВО до упора',
             svg: `<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#FF5722" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M19 12H5"/>
@@ -23,14 +23,14 @@ export const neck = {
                 <path d="M5 12l6-6"/>
             </svg>`
         },
-        {
+        { 
             text: 'Плавно вернитесь в центральное положение',
             svg: `<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="9"/>
                 <circle cx="12" cy="12" r="3" fill="#4CAF50"/>
             </svg>`
         },
-        {
+        { 
             text: 'Медленно поверните голову ВПРАВО до упора',
             svg: `<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#2196F3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12h14"/>
@@ -38,40 +38,40 @@ export const neck = {
                 <path d="M19 12l-6-6"/>
             </svg>`
         },
-        {
+        { 
             text: 'Вернитесь в центр - это 1 повторение',
             svg: `<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#FFD700" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"/>
             </svg>`
         }
     ],
-
+    
     svgIcons: {
         // Стрелка влево из Material Design
         headLeft: `<svg width="120" height="120" viewBox="0 0 24 24" fill="none">
             ircle cx="12" cy="12" r="11" fill="#FF5722" opacity="0.9595"/>
             <path d="M15 18l-6-6 6-6" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>`,
-
+        
         // Стрелка вправо из Material Design
         headRight: `<svg width="120" height="120" viewBox="0 0 24 24" fill="none">
             ircle cx="12" cy="12" r="11" fill="#2#2196F3" opacity="0.95"/>
             <path d="M9 18l6-6-6-6" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>`,
-
+        
         // Центр из Material Design
         headCenter: `<svg width="120" height="120" viewBox="0 0 24 24" fill="none">
             ircle cx="12" cy="12" r="11" fill="#4CAF50"0" opacity="0.95"/>
             ircle cx="12" cy="12"2" r="3" fill="white"/>
             ircle cx="12" cy="12" r="6" stroke="white" stroke-width="2"2" fill="none"/>
         </svg>`,
-
+        
         // Галочка из Material Design
         check: `<svg width="120" height="120" viewBox="0 0 24 24" fill="none">
             ircle cx="12" cy="12"2" r="11" fill="#4CAF50"/>
             <polyline points="7 12 10 15 17 8" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>`,
-
+        
         // Предупреждение из Material Design
         warning: `<svg width="120" height="120" viewBox="0 0 24 24" fill="none">
             ircle cx="12" cy="12" r="11"1" fill="#FF9800"/>
@@ -79,7 +79,7 @@ export const neck = {
             ircle cx="12" cy="1616" r="1" fill="white"/>
         </svg>`
     },
-
+    
     thresholds: {
         leftOffset: 0.08,
         rightOffset: -0.08,
@@ -89,27 +89,27 @@ export const neck = {
         maxTime: 2000,
         minTime: 500
     },
-
+    
     getInitialState() {
-        return {
+        return { 
             cycle: 'none',
             startTime: 0,
             lastStateTime: 0
         };
     },
-
+    
     analyze(lm, state, showHint, logError, calcAngle) {
         const nose = lm[1], leftCheek = lm[234], rightCheek = lm[454];
         const center = (leftCheek.x + rightCheek.x) / 2;
         const offset = nose.x - center;
         const now = performance.now();
-
+        
         let result = { counted: false, correct: false, status: 'Поверните влево' };
-
+        
         if (state.cycle === 'none' || state.cycle === 'complete') {
             state.startTime = now;
             state.lastStateTime = now;
-
+            
             if (offset > this.thresholds.leftOffset) {
                 state.cycle = 'left';
                 state.lastStateTime = now;
@@ -122,10 +122,10 @@ export const neck = {
                 showHint('Поверните голову ВЛЕВО', this.svgIcons.headLeft, 'rgba(255, 87, 34, 0.95)', 3000);
                 result.status = 'Поверните влево';
             }
-        }
+        } 
         else if (state.cycle === 'left') {
             const timeSinceLastState = now - state.lastStateTime;
-
+            
             if (Math.abs(offset) < this.thresholds.centerTolerance) {
                 if (timeSinceLastState < this.thresholds.minTime) {
                     showHint('Двигайтесь МЕДЛЕННЕЕ!', this.svgIcons.warning, 'rgba(255, 152, 0, 0.95)', 3000);
@@ -142,7 +142,7 @@ export const neck = {
             } else {
                 result.status = 'Возвращайтесь в центр';
             }
-        }
+        } 
         else if (state.cycle === 'center_after_left') {
             if (offset < this.thresholds.rightOffset) {
                 state.cycle = 'right';
@@ -156,15 +156,15 @@ export const neck = {
                 showHint('Поверните голову ВПРАВО', this.svgIcons.headRight, 'rgba(33, 150, 243, 0.95)', 3000);
                 result.status = 'Поверните вправо';
             }
-        }
+        } 
         else if (state.cycle === 'right') {
             const timeSinceLastState = now - state.lastStateTime;
-
+            
             if (Math.abs(offset) < this.thresholds.centerTolerance) {
                 const totalTime = now - state.startTime;
                 state.cycle = 'complete';
                 result.counted = true;
-
+                
                 if (timeSinceLastState < this.thresholds.minTime) {
                     showHint('Двигайтесь МЕДЛЕННЕЕ!', this.svgIcons.warning, 'rgba(255, 152, 0, 0.95)', 3000);
                     logError('Слишком быстро');
@@ -188,7 +188,7 @@ export const neck = {
                 result.status = 'Возвращайтесь в центр';
             }
         }
-
+        
         return result;
     }
 };

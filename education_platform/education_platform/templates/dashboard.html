@@ -33,7 +33,7 @@
         <div class="list-item">
             <h4>{{ test.subject }} - {{ test.topic }}</h4>
             <div class="meta">
-                Оценка: {{ test.score if test.score else 'Не завершен' }}% |
+                Оценка: {{ test.score if test.score else 'Не завершен' }}% | 
                 {{ test.created_at.strftime('%d.%m.%Y %H:%M') }}
             </div>
         </div>
@@ -50,8 +50,8 @@
         <div class="list-item">
             <h4>{{ pe.exercise_type }}</h4>
             <div class="meta">
-                Повторений: {{ pe.repetitions }} |
-                Оценка: {{ pe.score }}% |
+                Повторений: {{ pe.repetitions }} | 
+                Оценка: {{ pe.score }}% | 
                 {{ pe.created_at.strftime('%d.%m.%Y %H:%M') }}
             </div>
         </div>

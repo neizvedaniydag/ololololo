@@ -18,7 +18,7 @@ async function initializePoseLandmarker() {
     const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
     );
-
+    
     poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
         baseOptions: {
             modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
@@ -64,7 +64,7 @@ async function predictWebcam() {
 
     if (results.landmarks && results.landmarks.length > 0) {
         const drawingUtils = new DrawingUtils(canvasCtx);
-
+        
         for (const landmark of results.landmarks) {
             drawingUtils.drawLandmarks(landmark, {
                 radius: 4,
@@ -117,11 +117,11 @@ function analyzeSquat(landmarks) {
     if (avgKneeAngle < 100) {
         // Глубокое приседание
         exerciseCounter++;
-
+        
         // Проверка ошибок
         const hipWidth = Math.abs(leftHip.x - rightHip.x);
         const kneeWidth = Math.abs(leftKnee.x - rightKnee.x);
-
+        
         if (kneeWidth > hipWidth * 1.2) {
             errors.push(`Приседание ${exerciseCounter}: колени слишком широко расставлены`);
             incorrectCount++;
@@ -131,7 +131,7 @@ function analyzeSquat(landmarks) {
         } else {
             correctCount++;
         }
-
+        
         updateUI();
     }
 }
@@ -151,19 +151,19 @@ function analyzePushup(landmarks) {
 
     if (avgElbowAngle < 90) {
         exerciseCounter++;
-
+        
         // Проверка прямой спины
         const leftHip = landmarks[23];
         const rightHip = landmarks[24];
         const backAngle = Math.abs(leftShoulder.y - leftHip.y);
-
+        
         if (backAngle < 0.3) {
             errors.push(`Отжимание ${exerciseCounter}: прогиб в пояснице`);
             incorrectCount++;
         } else {
             correctCount++;
         }
-
+        
         updateUI();
     }
 }
@@ -173,17 +173,17 @@ function analyzePlank(landmarks) {
     const leftShoulder = landmarks[11];
     const leftHip = landmarks[23];
     const leftAnkle = landmarks[27];
-
+    
     // Проверка прямой линии тела
     const bodyAngle = calculateAngle(leftShoulder, leftHip, leftAnkle);
-
+    
     if (bodyAngle < 170 || bodyAngle > 190) {
         errors.push('Планка: тело не образует прямую линию');
         incorrectCount++;
     } else {
         correctCount++;
     }
-
+    
     updateUI();
 }
 
@@ -192,11 +192,11 @@ function calculateAngle(point1, point2, point3) {
     const radians = Math.atan2(point3.y - point2.y, point3.x - point2.x) -
                    Math.atan2(point1.y - point2.y, point1.x - point2.x);
     let angle = Math.abs(radians * 180.0 / Math.PI);
-
+    
     if (angle > 180.0) {
         angle = 360 - angle;
     }
-
+    
     return angle;
 }
 
@@ -211,20 +211,20 @@ function updateUI() {
 function startExercise() {
     const exercise = document.getElementById('exercise-select').value;
     currentExercise = exercise;
-
+    
     // Сброс счетчиков
     exerciseCounter = 0;
     correctCount = 0;
     incorrectCount = 0;
     errors = [];
     updateUI();
-
+    
     // Обратный отсчет 3-2-1
     let countdown = 3;
     const countdownEl = document.getElementById('countdown');
     countdownEl.style.display = 'block';
     countdownEl.textContent = countdown;
-
+    
     countdownTimer = setInterval(() => {
         countdown--;
         if (countdown > 0) {
@@ -243,11 +243,11 @@ function startExercise() {
 // Остановка упражнения
 function stopExercise() {
     isRecording = false;
-
+    
     // Вычисляем оценку
     const total = correctCount + incorrectCount;
     const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
-
+    
     // Отправляем результаты на сервер
     fetch('/api/save-pe-result', {
         method: 'POST',

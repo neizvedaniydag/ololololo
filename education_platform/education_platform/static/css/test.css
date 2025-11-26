@@ -447,7 +447,7 @@
         padding: 1rem;
         gap: 1rem;
     }
-
+    
     .test-sidebar {
         width: 100%;
         position: relative;
@@ -455,55 +455,55 @@
         max-height: none;
         padding: 1.5rem;
     }
-
+    
     .questions-nav {
         grid-template-columns: repeat(auto-fill, minmax(55px, 1fr));
     }
-
+    
     .test-main {
         padding: 2rem 1.5rem;
     }
-
+    
     .question-content h2 {
         font-size: 1.3rem;
     }
-
+    
     .option-letter {
         width: 35px;
         height: 35px;
         font-size: 1.1rem;
     }
-
+    
     .option-text {
         font-size: 1.05rem;
     }
-
+    
     .modal-content {
         padding: 1.5rem;
         max-width: 95%;
     }
-
+    
     .score-circle {
         width: 150px;
         height: 150px;
     }
-
+    
     .score-circle span {
         font-size: 2.5rem;
     }
-
+    
     .review-grid {
         grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
     }
-
+    
     .results-summary {
         grid-template-columns: 1fr;
     }
-
+    
     .detailed-question {
         padding: 1.5rem;
     }
-
+    
     .modal-actions {
         flex-direction: column;
     }

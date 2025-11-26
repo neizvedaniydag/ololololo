@@ -369,104 +369,104 @@
     .tests-container {
         padding: 1rem;
     }
-
+    
     .tests-container h1 {
         font-size: 1.75rem;
     }
-
+    
     .subject-selector,
     #topicsBlock,
     .tests-history {
         padding: 1.5rem;
         border-radius: 12px;
     }
-
+    
     .subjects-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: 0.75rem;
     }
-
+    
     .subject-btn {
         padding: 1.25rem 0.75rem;
         font-size: 1rem;
     }
-
+    
     .subject-icon {
         font-size: 2rem;
     }
-
+    
     .topics-grid {
         grid-template-columns: 1fr;
         gap: 0.75rem;
     }
-
+    
     .topic-btn {
         padding: 1.25rem;
         font-size: 1rem;
     }
-
+    
     .topics-header h2 {
         font-size: 1.3rem;
     }
-
+    
     .btn-custom-topic {
         padding: 1.5rem;
     }
-
+    
     .btn-custom-topic span:first-child {
         font-size: 1.5rem;
     }
-
+    
     .btn-custom-topic span:nth-child(2) {
         font-size: 1.1rem;
     }
-
+    
     .btn-custom-topic span:nth-child(3) {
         font-size: 0.9rem;
     }
-
+    
     .modal-content {
         padding: 1.5rem;
         max-width: 95%;
     }
-
+    
     .modal-header h2 {
         font-size: 1.25rem;
     }
-
+    
     .form-group label {
         font-size: 1rem;
     }
-
+    
     .form-group textarea {
         min-height: 250px;
         font-size: 0.95rem;
     }
-
+    
     .modal-actions {
         flex-direction: column;
     }
-
+    
     .btn-large {
         padding: 0.875rem 1.5rem;
         font-size: 1rem;
     }
-
+    
     .test-card {
         flex-direction: column;
         align-items: stretch;
         padding: 1.25rem;
     }
-
+    
     .test-info h3 {
         font-size: 1.1rem;
     }
-
+    
     .test-actions {
         flex-direction: column;
         width: 100%;
     }
-
+    
     .test-actions .btn {
         width: 100%;
         justify-content: center;
@@ -478,21 +478,21 @@
     .tests-container {
         padding: 0.75rem;
     }
-
+    
     .subjects-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: 0.5rem;
     }
-
+    
     .subject-btn {
         padding: 1rem 0.5rem;
         font-size: 0.9rem;
     }
-
+    
     .subject-icon {
         font-size: 1.75rem;
     }
-
+    
     .modal-content {
         padding: 1rem;
         border-radius: 12px;

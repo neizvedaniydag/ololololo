@@ -16,7 +16,7 @@
                 <span id="answeredCount">0</span> из {{ test_data.questions|length }}
             </div>
         </div>
-        
+
         <div class="questions-nav">
             {% for i in range(test_data.questions|length) %}
             <button class="question-nav-btn" data-question="{{ i }}" onclick="goToQuestion({{ i }})">
@@ -25,7 +25,7 @@
             </button>
             {% endfor %}
         </div>
-        
+
         <button class="btn btn-primary btn-finish" onclick="showReviewModal()" style="width: 100%; margin-top: auto;">
             Завершить тест
         </button>
@@ -39,10 +39,10 @@
             <div class="question-header">
                 <span class="question-num">Вопрос {{ i + 1 }} из {{ test_data.questions|length }}</span>
             </div>
-            
+
             <div class="question-content">
                 <h2 class="math-content">{{ question.question }}</h2>
-                
+
                 <div class="options-list">
                     {% for option in question.options %}
                     {% set j = loop.index0 %}
@@ -56,7 +56,7 @@
                     {% endfor %}
                 </div>
             </div>
-            
+
             <div class="question-footer">
                 <button class="btn btn-secondary" onclick="prevQuestion()" {% if i == 0 %}disabled{% endif %}>
                     ← Назад
@@ -123,7 +123,7 @@
             <h1 style="margin: 0;">Детальные результаты</h1>
             <button class="btn btn-secondary" onclick="location.href='{{ url_for('dashboard') }}'">На главную</button>
         </div>
-        
+
         <div class="results-summary">
             <div class="summary-item">
                 <span class="summary-label">Правильных:</span>
@@ -138,7 +138,7 @@
                 <span class="summary-value" id="finalScore">0%</span>
             </div>
         </div>
-        
+
         <div id="detailedAnswers"></div>
     </div>
 </div>
@@ -168,12 +168,12 @@ let answers = {};
 function goToQuestion(index) {
     document.querySelectorAll('.question-slide').forEach(q => q.style.display = 'none');
     document.getElementById('question-' + index).style.display = 'block';
-    
+
     document.querySelectorAll('.question-nav-btn').forEach(btn => btn.classList.remove('current'));
     document.querySelector(`[data-question="${index}"]`).classList.add('current');
-    
+
     currentQuestion = index;
-    
+
     // Рендерим математику для нового вопроса
     if (window.MathJax) {
         MathJax.typesetPromise();
@@ -211,7 +211,7 @@ function updateAnsweredCount() {
 function showReviewModal() {
     const grid = document.getElementById('reviewGrid');
     grid.innerHTML = '';
-    
+
     for (let i = 0; i < testData.questions.length; i++) {
         const item = document.createElement('div');
         item.className = 'review-item ' + (answers[i] !== undefined ? 'answered' : 'unanswered');
@@ -222,7 +222,7 @@ function showReviewModal() {
         };
         grid.appendChild(item);
     }
-    
+
     document.getElementById('reviewModal').classList.add('active');
 }
 
@@ -246,7 +246,7 @@ function closeConfirmModal() {
 
 function submitTest() {
     closeConfirmModal();
-    
+
     fetch('{{ url_for("check_test", test_id=test.id) }}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -255,13 +255,13 @@ function submitTest() {
     .then(response => response.json())
     .then(data => {
         document.getElementById('scoreValue').textContent = data.score + '%';
-        document.getElementById('resultText').textContent = 
+        document.getElementById('resultText').textContent =
             `Правильных ответов: ${data.correct} из ${data.total}`;
-        
+
         document.getElementById('correctCount').textContent = data.correct;
         document.getElementById('incorrectCount').textContent = data.total - data.correct;
         document.getElementById('finalScore').textContent = data.score + '%';
-        
+
         window.testResults = data;
         document.getElementById('resultModal').classList.add('active');
     });
@@ -271,20 +271,20 @@ function showDetailedResults() {
     document.getElementById('resultModal').classList.remove('active');
     document.querySelector('.test-wrapper').style.display = 'none';
     document.getElementById('detailedResults').style.display = 'block';
-    
+
     const container = document.getElementById('detailedAnswers');
     container.innerHTML = '';
-    
+
     testData.questions.forEach((question, i) => {
         const userAnswer = answers[i];
         const correctAnswer = question.correct;
         const isCorrect = userAnswer === correctAnswer;
-        
+
         const div = document.createElement('div');
         div.className = 'detailed-question ' + (isCorrect ? 'correct' : 'incorrect');
-        
+
         const russianLetters = 'АБВГ';
-        
+
         let html = `
             <h3>
                 Вопрос ${i + 1}
@@ -294,11 +294,11 @@ function showDetailedResults() {
             </h3>
             <p class="math-content">${question.question}</p>
         `;
-        
+
         question.options.forEach((option, j) => {
             let className = '';
             let prefix = russianLetters[j] + '. ';
-            
+
             if (j === correctAnswer) {
                 className = 'answer-option correct-answer';
                 prefix = '✓ ' + prefix + ' (Правильный ответ) ';
@@ -308,23 +308,23 @@ function showDetailedResults() {
             } else {
                 className = 'answer-option';
             }
-            
+
             html += `<div class="${className}"><span class="math-content">${prefix}${option}</span></div>`;
         });
-        
+
         // Показываем пояснение для неправильных ответов
         if (!isCorrect) {
             let explanation = question.explanation;
-            
+
             if (!explanation || explanation.trim() === '') {
                 explanation = `
                     <strong>Правильный ответ:</strong> ${russianLetters[correctAnswer]}. ${question.options[correctAnswer]}<br><br>
                     <strong>Ваш ответ был неверным, потому что:</strong><br>
-                    Вы выбрали вариант ${russianLetters[userAnswer]}: "${question.options[userAnswer]}", 
+                    Вы выбрали вариант ${russianLetters[userAnswer]}: "${question.options[userAnswer]}",
                     но правильным является вариант ${russianLetters[correctAnswer]}.
                 `;
             }
-            
+
             html += `
                 <div class="explanation">
                     <strong>💡 Подробное пояснение:</strong>
@@ -332,16 +332,16 @@ function showDetailedResults() {
                 </div>
             `;
         }
-        
+
         div.innerHTML = html;
         container.appendChild(div);
     });
-    
+
     // Рендерим математику для результатов
     if (window.MathJax) {
         MathJax.typesetPromise();
     }
-    
+
     window.scrollTo(0, 0);
 }
 

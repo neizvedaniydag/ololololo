@@ -29,9 +29,9 @@
             </h2>
             <button class="btn btn-secondary btn-sm" onclick="backToSubjects()">← Назад</button>
         </div>
-
+        
         <div class="topics-grid" id="topicsGrid"></div>
-
+        
         <!-- Кнопка добавить свой материал -->
         <div class="custom-topic-btn-wrapper">
             <button class="btn-custom-topic" onclick="openCustomModal()">
@@ -45,7 +45,7 @@
     <!-- История тестов -->
     <div class="tests-history">
         <h2>Мои тесты</h2>
-
+        
         {% if tests %}
         <div class="tests-list">
             {% for test in tests %}
@@ -81,11 +81,11 @@
             <h2>📄 Загрузка своего материала</h2>
             <button class="modal-close" onclick="closeCustomModal()">×</button>
         </div>
-
+        
         <form id="customTestForm">
             <div class="form-group">
                 <label>Вставьте текст материала</label>
-                <textarea id="customText" name="custom_text"
+                <textarea id="customText" name="custom_text" 
                           placeholder="Вставьте сюда текст лекции, параграф учебника или любой образовательный материал...
 
 Примеры:
@@ -134,7 +134,7 @@
             <h2 id="topicModalTitle"></h2>
             <button class="modal-close" onclick="closeSettingsModal()">×</button>
         </div>
-
+        
         <form id="standardTestForm">
             <div class="form-group">
                 <label>Количество вопросов</label>
@@ -184,7 +184,7 @@ fetch('/api/subjects-topics')
             TOPICS[subject] = data[subject].topics;
             ICONS[subject] = data[subject].icon;
         });
-
+        
         // Генерируем кнопки предметов
         renderSubjects();
     })
@@ -195,7 +195,7 @@ fetch('/api/subjects-topics')
 function renderSubjects() {
     const grid = document.getElementById('subjectsGrid');
     grid.innerHTML = '';
-
+    
     Object.keys(TOPICS).forEach(subject => {
         const btn = document.createElement('button');
         btn.className = 'subject-btn';
@@ -211,16 +211,16 @@ function renderSubjects() {
 function selectSubject(subject) {
     currentSubject = subject;
     currentSubjectIcon = ICONS[subject];
-
+    
     document.querySelectorAll('.subject-btn').forEach(btn => btn.classList.remove('active'));
     event.target.closest('.subject-btn').classList.add('active');
-
+    
     document.getElementById('selectedSubjectIcon').textContent = currentSubjectIcon;
     document.getElementById('selectedSubjectName').textContent = subject;
-
+    
     const topicsGrid = document.getElementById('topicsGrid');
     topicsGrid.innerHTML = '';
-
+    
     TOPICS[subject].forEach(topic => {
         const btn = document.createElement('button');
         btn.className = 'topic-btn';
@@ -228,7 +228,7 @@ function selectSubject(subject) {
         btn.onclick = () => selectTopic(topic);
         topicsGrid.appendChild(btn);
     });
-
+    
     document.getElementById('topicsBlock').style.display = 'block';
     document.getElementById('topicsBlock').scrollIntoView({ behavior: 'smooth' });
 }
@@ -272,40 +272,40 @@ customText.addEventListener('input', function() {
 document.getElementById('standardTestForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     closeSettingsModal();
-
+    
     const formData = {
         subject: currentSubject,
         topic: selectedTopic,
         num_questions: parseInt(document.getElementById('num_questions').value)
     };
-
+    
     await generateTest(formData);
 });
 
 // Отправка кастомной формы
 document.getElementById('customTestForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-
+    
     const text = document.getElementById('customText').value;
-
+    
     if (text.length < 200) {
         alert('Пожалуйста, введите минимум 200 символов текста для качественного теста');
         return;
     }
-
+    
     closeCustomModal();
-
+    
     const formData = {
         custom_text: text,
         num_questions: parseInt(document.getElementById('custom_num_questions').value)
     };
-
+    
     await generateTest(formData);
 });
 
 async function generateTest(data) {
     document.getElementById('loadingModal').style.display = 'flex';
-
+    
     try {
         const response = await fetch('/api/generate-test', {
             method: 'POST',
@@ -314,9 +314,9 @@ async function generateTest(data) {
             },
             body: JSON.stringify(data)
         });
-
+        
         const result = await response.json();
-
+        
         if (result.success) {
             window.location.href = `/test/${result.test_id}`;
         } else {
@@ -333,12 +333,12 @@ async function deleteTest(testId) {
     if (!confirm('Вы уверены, что хотите удалить этот тест?')) {
         return;
     }
-
+    
     try {
         const response = await fetch(`/api/test/${testId}`, {
             method: 'DELETE'
         });
-
+        
         if (response.ok) {
             location.reload();
         } else {
