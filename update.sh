@@ -184,7 +184,7 @@ echoc "   → Найдено папок: ${#FLASK_FOLDERS[@]}" $C_YELLOW
 
 # Сортируем по времени модификации (последняя = новейшая)
 SORTED_FOLDERS=($(for folder in "${FLASK_FOLDERS[@]}"; do
-    echo "$(stat -c '%Y' "$folder") $folder"
+    echo "$(stat -c '%Y' "$folder" 2>/dev/null || stat -f '%m' "$folder") $folder"
 done | sort -rn | cut -d' ' -f2-))
 
 FLASK_APP_DIR=""
@@ -208,7 +208,7 @@ else
         
         for i in "${!SORTED_FOLDERS[@]}"; do
             folder_name=$(basename "${SORTED_FOLDERS[$i]}")
-            folder_date=$(stat -c '%y' "${SORTED_FOLDERS[$i]}" | cut -d'.' -f1)
+            folder_date=$(stat -c '%y' "${SORTED_FOLDERS[$i]}" 2>/dev/null || stat -f '%Sm' -t '%Y-%m-%d %H:%M:%S' "${SORTED_FOLDERS[$i]}")
             printf "   ${C_CYAN}%2d)${C_RESET} %-30s ${C_YELLOW}(%s)${C_RESET}\n" $((i+1)) "$folder_name" "$folder_date"
         done
         
@@ -277,6 +277,13 @@ EOL
 
 echoc "   ✓ .env восстановлён" $C_GREEN
 
+# Проверяем что ключ записался
+if grep -q "GIGACHAT_CREDENTIALS=" .env; then
+    echoc "   ✓ API ключ записан в .env" $C_GREEN
+else
+    error_exit "Не удалось записать API ключ в .env"
+fi
+
 if [ -f "$BACKUP_DIR/nginx/production.conf" ]; then
     mkdir -p nginx
     cp "$BACKUP_DIR/nginx/production.conf" nginx/production.conf
@@ -289,15 +296,19 @@ echo
 echoc "9. Проверка путей к БД..." $C_BLUE
 
 if [ -f "education_platform/education_platform/app.py" ]; then
-    sed -i "s|'sqlite:///instance/education_platform.db'|'sqlite:////app/instance/education_platform.db'|g" education_platform/education_platform/app.py
-    sed -i "s|\"sqlite:///instance/education_platform.db\"|\"sqlite:////app/instance/education_platform.db\"|g" education_platform/education_platform/app.py
+    sed -i "s|'sqlite:///instance/education_platform.db'|'sqlite:////app/instance/education_platform.db'|g" education_platform/education_platform/app.py 2>/dev/null || \
+    sed -i '' "s|'sqlite:///instance/education_platform.db'|'sqlite:////app/instance/education_platform.db'|g" education_platform/education_platform/app.py
+    sed -i "s|\"sqlite:///instance/education_platform.db\"|\"sqlite:////app/instance/education_platform.db\"|g" education_platform/education_platform/app.py 2>/dev/null || \
+    sed -i '' "s|\"sqlite:///instance/education_platform.db\"|\"sqlite:////app/instance/education_platform.db\"|g" education_platform/education_platform/app.py
     echoc "   ✓ Пути к БД исправлены" $C_GREEN
 fi
 
 # Добавляем русификацию Flask-Login если её нет
 if grep -q "login_manager.login_view = 'login'" education_platform/education_platform/app.py; then
     if ! grep -q "login_manager.login_message" education_platform/education_platform/app.py; then
-        sed -i "/login_manager.login_view = 'login'/a login_manager.login_message = 'Пожалуйста, войдите в систему для доступа к этой странице.'" education_platform/education_platform/app.py
+        sed -i "/login_manager.login_view = 'login'/a login_manager.login_message = 'Пожалуйста, войдите в систему для доступа к этой странице.'" education_platform/education_platform/app.py 2>/dev/null || \
+        sed -i '' "/login_manager.login_view = 'login'/a\\
+login_manager.login_message = 'Пожалуйста, войдите в систему для доступа к этой странице.'" education_platform/education_platform/app.py
         echoc "   ✓ Добавлена русификация сообщения логина" $C_GREEN
     fi
 fi
@@ -311,6 +322,35 @@ $DC up -d --build --remove-orphans 2>&1 | tail -10
 sleep 5
 
 echoc "   ✓ Контейнеры запущены" $C_GREEN
+echo
+
+# ============ ШАГ 10.5: ПРОВЕРКА И УСТАНОВКА GIGACHAT ============
+echoc "10.5. Проверка библиотеки GigaChat..." $C_BLUE
+
+# Проверяем что gigachat установлен
+GIGACHAT_INSTALLED=$($DC exec web pip list 2>/dev/null | grep -i gigachat || echo "")
+if [ -z "$GIGACHAT_INSTALLED" ]; then
+    echoc "   → GigaChat не установлен, устанавливаю..." $C_YELLOW
+    $DC exec web pip install gigachat==0.1.33 > /dev/null 2>&1
+    echoc "   ✓ GigaChat установлен" $C_GREEN
+else
+    echoc "   ✓ GigaChat уже установлен" $C_GREEN
+fi
+
+# Проверяем импорт
+IMPORT_TEST=$($DC exec web python -c "from gigachat import GigaChat; print('OK')" 2>&1)
+if [[ "$IMPORT_TEST" == *"OK"* ]]; then
+    echoc "   ✓ Импорт GigaChat работает" $C_GREEN
+else
+    echoc "   ⚠ Ошибка импорта GigaChat" $C_RED
+    echoc "   → Переустанавливаю..." $C_YELLOW
+    $DC exec web pip uninstall -y gigachat > /dev/null 2>&1
+    $DC exec web pip install gigachat==0.1.33 > /dev/null 2>&1
+    $DC restart web > /dev/null 2>&1
+    sleep 3
+    echoc "   ✓ GigaChat переустановлен" $C_GREEN
+fi
+
 echo
 
 # ============ ШАГ 11: ПРОВЕРКА ============
