@@ -79,19 +79,19 @@ PROJECT_NAME=$(basename $(pwd) | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]
 VOLUME_NAME="${PROJECT_NAME}_certbot_certs"
 if docker volume ls --format '{{.Name}}' | grep -q "^${VOLUME_NAME}$"; then
     echoc "   → Volume сертификатов найден, проверяю содержимое..." $C_YELLOW
-    
+
     # Быстрая проверка наличия файлов сертификата через alpine контейнер
     CERT_CHECK=$(docker run --rm -v ${VOLUME_NAME}:/certs alpine sh -c 'find /certs/live -name "fullchain.pem" 2>/dev/null | head -n1' || echo "")
-    
+
     if [ ! -z "$CERT_CHECK" ]; then
         # Извлекаем имя домена из пути
         EXISTING_DOMAIN=$(echo "$CERT_CHECK" | sed 's|/certs/live/\([^/]*\)/.*|\1|')
-        
+
         # Проверяем срок действия сертификата
         EXPIRY_TIMESTAMP=$(docker run --rm -v ${VOLUME_NAME}:/certs alpine sh -c "stat -c %Y /certs/live/${EXISTING_DOMAIN}/cert.pem 2>/dev/null" || echo "0")
         CURRENT_TIMESTAMP=$(date +%s)
         CERT_AGE_DAYS=$(( ($CURRENT_TIMESTAMP - $EXPIRY_TIMESTAMP) / 86400 ))
-        
+
         # Сертификат Let's Encrypt действителен 90 дней, обновляется за 30 дней до истечения
         if [ "$CERT_AGE_DAYS" -lt 60 ]; then
             CERT_EXISTS=true
@@ -117,30 +117,8 @@ docker system prune -f 2>/dev/null || true
 echoc "   ✓ Старые контейнеры удалены" $C_GREEN
 echo
 
-# ============ ШАГ 5: ИСПРАВЛЕНИЕ DOCKER-COMPOSE.YML ============
-echoc "5. Проверка и исправление docker-compose.yml..." $C_BLUE
-
-if [ -f "docker-compose.yml" ]; then
-    if grep -q "^version:" docker-compose.yml; then
-        sed -i '/^version:/d' docker-compose.yml
-        echoc "   ✓ Удалена строка 'version'" $C_GREEN
-    fi
-    
-    if ! grep -q "restart: always" docker-compose.yml; then
-        echoc "   → Добавляю 'restart: always'..." $C_YELLOW
-        sed -i '/web:/a\    restart: always' docker-compose.yml
-        sed -i '/nginx:/a\    restart: always' docker-compose.yml
-        echoc "   ✓ Контейнеры будут работать 24/7" $C_GREEN
-    else
-        echoc "   ✓ Автозапуск 24/7 уже настроен" $C_GREEN
-    fi
-else
-    echoc "   ⚠ docker-compose.yml не найден" $C_YELLOW
-fi
-echo
-
-# ============ ШАГ 6: СБОР ДАННЫХ ============
-echoc "6. Сбор информации..." $C_BLUE
+# ============ ШАГ 5: СБОР ДАННЫХ ============
+echoc "5. Сбор информации..." $C_BLUE
 
 if [ "$CERT_EXISTS" = true ]; then
     DOMAIN="$EXISTING_DOMAIN"
@@ -173,8 +151,8 @@ else
 fi
 echo
 
-# ============ ШАГ 7: СОЗДАНИЕ КОНФИГУРАЦИИ ============
-echoc "7. Создание конфигурации..." $C_BLUE
+# ============ ШАГ 6: СОЗДАНИЕ КОНФИГУРАЦИИ ============
+echoc "6. Создание конфигурации..." $C_BLUE
 
 SECRET_KEY=$(openssl rand -hex 32)
 cat > .env <<EOL
@@ -183,8 +161,15 @@ GIGACHAT_CREDENTIALS=${GIGACHAT_CREDENTIALS}
 FLASK_APP=app.py
 EOL
 
-sed -i 's/[[:space:]]*$//' .env
+sed -i 's/[[:space:]]*$//' .env 2>/dev/null || sed -i '' 's/[[:space:]]*$//' .env
 echoc "   ✓ Файл .env создан" $C_GREEN
+
+# Проверяем что ключ записался
+if grep -q "GIGACHAT_CREDENTIALS=" .env; then
+    echoc "   ✓ API ключ записан в .env" $C_GREEN
+else
+    error_exit "Не удалось записать API ключ в .env"
+fi
 
 mkdir -p nginx
 cat > nginx/nginx.conf.template <<'NGINXEOF'
@@ -226,16 +211,18 @@ NGINXEOF
 sed "s/%%DOMAIN%%/${DOMAIN}/g" nginx/nginx.conf.template > nginx/production.conf
 
 if [ -f "education_platform/education_platform/app.py" ]; then
-    sed -i "s|'sqlite:///instance/education_platform.db'|'sqlite:////app/instance/education_platform.db'|g" education_platform/education_platform/app.py
-    sed -i "s|\"sqlite:///instance/education_platform.db\"|\"sqlite:////app/instance/education_platform.db\"|g" education_platform/education_platform/app.py
+    sed -i "s|'sqlite:///instance/education_platform.db'|'sqlite:////app/instance/education_platform.db'|g" education_platform/education_platform/app.py 2>/dev/null || \
+    sed -i '' "s|'sqlite:///instance/education_platform.db'|'sqlite:////app/instance/education_platform.db'|g" education_platform/education_platform/app.py
+    sed -i "s|\"sqlite:///instance/education_platform.db\"|\"sqlite:////app/instance/education_platform.db\"|g" education_platform/education_platform/app.py 2>/dev/null || \
+    sed -i '' "s|\"sqlite:///instance/education_platform.db\"|\"sqlite:////app/instance/education_platform.db\"|g" education_platform/education_platform/app.py
     echoc "   ✓ Путь к БД исправлен" $C_GREEN
 fi
 
 echoc "   ✓ Конфигурация создана" $C_GREEN
 echo
 
-# ============ ШАГ 8: ПРОВЕРКА DNS ============
-echoc "8. Проверка DNS..." $C_BLUE
+# ============ ШАГ 7: ПРОВЕРКА DNS ============
+echoc "7. Проверка DNS..." $C_BLUE
 PUBLIC_IP=$(curl -s http://ipinfo.io/ip || echo "unknown")
 DOMAIN_IP=$(dig +short $DOMAIN @8.8.8.8 | head -n1 || echo "unknown")
 echoc "   IP сервера: ${PUBLIC_IP}" $C_YELLOW
@@ -250,14 +237,14 @@ else
 fi
 echo
 
-# ============ ШАГ 9: SSL СЕРТИФИКАТ ============
-echoc "9. Управление SSL сертификатом..." $C_BLUE
+# ============ ШАГ 8: SSL СЕРТИФИКАТ ============
+echoc "8. Управление SSL сертификатом..." $C_BLUE
 
 if [ "$CERT_EXISTS" = true ]; then
     echoc "   ✓ Используется существующий сертификат" $C_GREEN
 else
     echoc "   → Получение нового SSL сертификата..." $C_YELLOW
-    
+
     timeout 120 $DC run --rm -p 80:80 --entrypoint "\
       certbot certonly --standalone \
         --email $EMAIL \
@@ -270,20 +257,49 @@ else
         read -p "   Продолжить без SSL? (y/N) " cont_no_ssl
         [ "$cont_no_ssl" != "y" ] && [ "$cont_no_ssl" != "Y" ] && error_exit "Прервано"
     }
-    
+
     echoc "   ✓ SSL сертификат получен!" $C_GREEN
 fi
 echo
 
-# ============ ШАГ 10: ЗАПУСК КОНТЕЙНЕРОВ ============
-echoc "10. Запуск сервисов..." $C_BLUE
+# ============ ШАГ 9: ЗАПУСК КОНТЕЙНЕРОВ ============
+echoc "9. Запуск сервисов..." $C_BLUE
 $DC up -d --build --remove-orphans 2>&1 | tail -5
 sleep 5
 echoc "   ✓ Контейнеры запущены" $C_GREEN
 echo
 
-# ============ ШАГ 11: ПРОВЕРКА ============
-echoc "11. Финальная проверка..." $C_BLUE
+# ============ ШАГ 9.5: ПРОВЕРКА И УСТАНОВКА GIGACHAT ============
+echoc "9.5. Проверка библиотеки GigaChat..." $C_BLUE
+
+# Проверяем что gigachat установлен
+GIGACHAT_INSTALLED=$($DC exec web pip list 2>/dev/null | grep -i gigachat || echo "")
+if [ -z "$GIGACHAT_INSTALLED" ]; then
+    echoc "   → GigaChat не установлен, устанавливаю..." $C_YELLOW
+    $DC exec web pip install gigachat==0.1.33 > /dev/null 2>&1
+    echoc "   ✓ GigaChat установлен" $C_GREEN
+else
+    echoc "   ✓ GigaChat уже установлен" $C_GREEN
+fi
+
+# Проверяем импорт
+IMPORT_TEST=$($DC exec web python -c "from gigachat import GigaChat; print('OK')" 2>&1)
+if [[ "$IMPORT_TEST" == *"OK"* ]]; then
+    echoc "   ✓ Импорт GigaChat работает" $C_GREEN
+else
+    echoc "   ⚠ Ошибка импорта GigaChat" $C_RED
+    echoc "   → Переустанавливаю..." $C_YELLOW
+    $DC exec web pip uninstall -y gigachat > /dev/null 2>&1
+    $DC exec web pip install gigachat==0.1.33 > /dev/null 2>&1
+    $DC restart web > /dev/null 2>&1
+    sleep 3
+    echoc "   ✓ GigaChat переустановлен" $C_GREEN
+fi
+
+echo
+
+# ============ ШАГ 10: ПРОВЕРКА ============
+echoc "10. Финальная проверка..." $C_BLUE
 $DC ps
 echo
 
@@ -298,8 +314,8 @@ echoc "   → Проверка логов Flask..." $C_YELLOW
 $DC logs web 2>&1 | tail -10 | grep -i "error\|fail" && echoc "   ⚠ Есть ошибки в логах" $C_RED || echoc "   ✓ Логи чистые" $C_GREEN
 echo
 
-# ============ ШАГ 12: АВТОМОНИТОРИНГ ============
-echoc "12. Настройка автомониторинга..." $C_BLUE
+# ============ ШАГ 11: АВТОМОНИТОРИНГ ============
+echoc "11. Настройка автомониторинга..." $C_BLUE
 
 CRON_CHECK="*/5 * * * * docker compose -f $(pwd)/docker-compose.yml ps | grep -q 'Up' || docker compose -f $(pwd)/docker-compose.yml up -d >> /var/log/docker-autostart.log 2>&1"
 CRON_SSL="0 1,13 * * * cd $(pwd) && docker compose run --rm certbot renew && docker compose exec nginx nginx -s reload >> /var/log/ssl-renewal.log 2>&1"
